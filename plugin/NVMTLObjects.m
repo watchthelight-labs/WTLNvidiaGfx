@@ -3676,7 +3676,10 @@ static BOOL nvmtl_pixel_sampler_update(NSMutableDictionary *states, NSString *in
         // <wtl>
         // same pipeline, same sampler values as this encoder's last draw: its choice stands (no lock, no lookup; ANGLE
         // binds every draw)
-        if (_svSel && _svFor==_ps && _svKey==key) return _svSel==[NSNull null] ? nil : _svSel;
+        // NVMTL_NO_SV_MEMO=1 (nvrm610.conf) looks the variant up on every draw again, to A/B a text glitch
+        static int memo = -1;
+        if (memo < 0) { const char *e = getenv("NVMTL_NO_SV_MEMO"); memo = !(e && *e && *e != '0'); }
+        if (memo && _svSel && _svFor==_ps && _svKey==key) return _svSel==[NSNull null] ? nil : _svSel;
         _svFor=_ps; _svKey=key; _svSel=nil;
         // </wtl>
         @synchronized(_ps) {
@@ -3938,7 +3941,11 @@ static MTLPixelFormat nvmtl_swizzle_twin_mtl(MTLPixelFormat f) { return (MTLPixe
     ps = (id<MTLRenderPipelineState>)[self nvmtlColourTwinPipeline:(NVMTLRenderPipelineState *)ps];
     // The same pipeline again inside a begun pass changes nothing: Apple's OpenGL renderer sets it before every draw, so
     // GL games paid a full bind per draw (the GL-on-Metal per-draw overhead). Not inside an open pass-time pool.
-    if (ps && (NVMTLRenderPipelineState *)ps == _ps && _begun && !(_cb->_c.pt_open && _cb->_c.pt_pool)) return;
+    // <wtl> NVMTL_NO_PSO_SKIP=1 (nvrm610.conf) sets it every time again, to A/B a text glitch reported against this
+    static int skip = -1;
+    if (skip < 0) { const char *e = getenv("NVMTL_NO_PSO_SKIP"); skip = !(e && *e && *e != '0'); }
+    if (skip && ps && (NVMTLRenderPipelineState *)ps == _ps && _begun && !(_cb->_c.pt_open && _cb->_c.pt_pool)) return;
+    // </wtl>
     // NVMTL_DUMP_PSO=<text>: the first encoder that sets a pipeline whose label contains it has the fragment buffers bound
     // at its end dumped, as NVMTL_DUMP_GROUP does, for apps that label pipelines but push no debug groups (diagnostic)
     // Only asked for when the switch is set: this runs on every pipeline bind, and an unconditional `ps.label` was a message
