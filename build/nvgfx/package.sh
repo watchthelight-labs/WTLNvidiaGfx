@@ -5,6 +5,7 @@
 #   Components to swap are given as env vars pointing at built files (unset = keep shipped):
 #     NVGFX_PLUGIN (NVMTLDriver), NVGFX_XLATE (libnvmtl_translate.dylib), NVGFX_NVK (libvulkan_nouveau.dylib),
 #     NVGFX_NVRM, NVGFX_NVRMFB, NVGFX_NVACCEL15, NVGFX_NVACCEL26 (.kext bundles)
+#   NVGFX_AUDIO=1 keeps the shipped NMXAudio.kext (left out by default)
 # The result keeps install.sh/uninstall.sh unchanged; SHA256SUMS, BASELINE-IDENTITY.json and NVGFX-VERSION are rewritten.
 # <wtl> fork: nvgfx | author: watchthelight </wtl>
 set -euo pipefail
@@ -12,7 +13,14 @@ LABEL=${1:?usage: package.sh <label, e.g. 2.1.0-nvgfx.1>}
 REF=${REF:-$HOME/Hackintosh/tooling/quarantine/nullmoth-release-2.3.7/x/pkgroot}
 OUT=${OUT:-$HOME/src/NvGfx-build/pkg/$LABEL}
 R=$(cd "$(dirname "$0")/../.." && pwd)
-rm -rf "$OUT"; mkdir -p "$(dirname "$OUT")"; cp -Rp "$REF" "$OUT"
+rm -rf "$OUT"; mkdir -p "$(dirname "$OUT")"; mkdir -p "$OUT"
+# 2.8 installs NMXAudio on macOS 26 whenever an HD Audio controller exists; the Legion already runs VoodooHDA on it.
+AUDIO_SKIP=(); [ "${NVGFX_AUDIO:-0}" = 1 ] || AUDIO_SKIP=(--exclude ./Library/Extensions/NMXAudio.kext)
+(cd "$REF" && tar cf - ${AUDIO_SKIP[@]+"${AUDIO_SKIP[@]}"} .) | (cd "$OUT" && tar xpf -)
+if [ "${NVGFX_AUDIO:-0}" != 1 ] && grep -q ' Library/Extensions/NMXAudio\.kext/' "$OUT/SHA256SUMS"; then
+  grep -v ' Library/Extensions/NMXAudio\.kext/' "$OUT/SHA256SUMS" > "$OUT/SHA256SUMS.new" && mv "$OUT/SHA256SUMS.new" "$OUT/SHA256SUMS"
+  echo "left out NMXAudio.kext (NVGFX_AUDIO=1 keeps it)"
+fi
 B=$OUT/Library/GPUBundles/NVMTLDriver.bundle
 swap_file() { [ -n "${1:-}" ] || return 0; cp "$1" "$2"; codesign -f -s - "$2" 2>/dev/null; echo "swapped $(basename "$2") <- $1"; }
 swap_kext() { [ -n "${1:-}" ] || return 0; rm -rf "$2"; cp -Rp "$1" "$2"; echo "swapped $(basename "$2") <- $1"; }
