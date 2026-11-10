@@ -6,6 +6,7 @@ The `nvgfx` branch is NullMoth's 2.1.0 plus the changes in the README table. Thi
 ## Branches and versions
 
 - `main`: upstream as pulled (tags `v2.1.0` .. `v2.4.3`).
+- `nvgfx-2.8.1` (rebase onto upstream 2.8.1, plugin compiles, NVRM not yet rebuilt for NVIDIA 620.70.06, not booted): see the changelog.
 - `nvgfx-2.6.2` (current, default, booted 2026-10-27 as 2.6.2-nvgfx.1): the fork's changes on top of the upstream 2.6.2 tag, packages labelled
   `2.6.2-nvgfx.N` (REF = NullMoth's 2.6.2 pkgroot). It carries everything from `nvgfx-2.5.3` and `cache-write-async`,
   adds the HiDPI flag on scaled modes (#354), puts back app samplers that a shader's own sampler displaced (#363), and

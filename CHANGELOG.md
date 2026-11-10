@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.8.1-nvgfx.1 (fork, not yet built in full, not yet booted)
+
+- Rebased onto NullMoth 2.8.1 (branch `nvgfx-2.8.1`). Upstream now carries most of the fork's plugin and translator
+  work, so those commits dropped out: the shader cache folder fallback, the per-module memo, the cache I/O queue, the
+  refused-link memo, the asynchronous IOSurface upload, the repeat-pipeline skip, the HiDPI flag on scaled modes, the
+  sampler restore, the buffer memory type, and GeekAudio's translator changes.
+- Still the fork's own: the NVRM power glue (`nvrmtgp`, `nvrmgps`, `nvrmnvpcf`, `nvrmphysctl`), the Intel panel proxy
+  head in NVRMFB (`nvfbigpu=1`, off by default, merged into upstream's new mode list code), the render encoder's
+  sampler-variant memo, the two A/B switches `NVMTL_NO_PSO_SKIP` and `NVMTL_NO_SV_MEMO`, the build harness and the
+  tools.
+- `build_plugin.sh` builds upstream's DLSS sources and links MetalFX. The plugin needs the macOS 26 SDK from 2.8 on;
+  the kext builds keep the 15.5 SDK. The release plugin compiles and carries upstream's feature markers.
+- Open: upstream 2.8 moved NVRM to NVIDIA 620.70.06. The NVRM harness, NVRMFB and NVAccel have not been built against
+  620 yet, so there is no package of this version.
+
 ## 2.6.2-nvgfx.1 (fork, booted 2026-10-27)
 
 Booted on the Legion 5 15IAX10 (RTX 5070 Laptop, macOS 26.7.1 25G241, BIOS Discrete) on 2026-10-27 (N-294): Metal 3,
