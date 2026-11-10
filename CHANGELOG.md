@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.8.1-nvgfx.1 (fork, not yet built in full, not yet booted)
+## 2.8.1-nvgfx.1 (fork, built, not yet booted)
 
 - Rebased onto NullMoth 2.8.1 (branch `nvgfx-2.8.1`). Upstream now carries most of the fork's plugin and translator
   work, so those commits dropped out: the shader cache folder fallback, the per-module memo, the cache I/O queue, the
@@ -12,6 +12,11 @@
   tools.
 - `build_plugin.sh` builds upstream's DLSS sources and links MetalFX. The plugin needs the macOS 26 SDK from 2.8 on;
   the kext builds keep the 15.5 SDK. The release plugin compiles and carries upstream's feature markers.
+- NVRM rebuilt on NVIDIA 620.70.06 (`NVRM_TAG=620.70.06 build_nvrm.sh`). Against the shipped 2.8.1 kext the load
+  commands are identical and 28744 of 28755 functions have the same size; the rest is the fork's power code. NVAccel
+  for macOS 15 and 26 matches the shipped builds section for section.
+- `package.sh` leaves upstream's new NMXAudio.kext out unless `NVGFX_AUDIO=1`. The 2.8 installer adds it on macOS 26
+  whenever an HD Audio controller exists, which collides with a machine that already runs VoodooHDA.
 - Open: upstream 2.8 moved NVRM to NVIDIA 620.70.06. The NVRM harness, NVRMFB and NVAccel have not been built against
   620 yet, so there is no package of this version.
 
