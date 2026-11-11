@@ -217,11 +217,20 @@ xg_find_pci(uint16_t vendor, uint8_t cls, uint8_t sub)
 	return found;
 }
 
+/* a MUX in discrete mode leaves the iGPU as display-other (0x0380) instead of VGA (0x0300) */
+static IOPCIDevice *
+xg_find_igpu(void)
+{
+	IOPCIDevice *gpu = xg_find_pci(0x8086, 0x03, 0x00);
+
+	return gpu ? gpu : xg_find_pci(0x8086, 0x03, 0x80);
+}
+
 static int
 xg_probe(void)
 {
 	OSDictionary *d = OSDictionary::withCapacity(32);
-	IOPCIDevice *gpu = xg_find_pci(0x8086, 0x03, 0x00), *smb = xg_find_pci(0x8086, 0x0c, 0x05);
+	IOPCIDevice *gpu = xg_find_igpu(), *smb = xg_find_pci(0x8086, 0x0c, 0x05);
 	int rc = 1;
 
 	if (!d)
@@ -313,7 +322,7 @@ static int
 xg_display_check(void)
 {
 	OSDictionary *d = OSDictionary::withCapacity(8);
-	IOPCIDevice *gpu = xg_find_pci(0x8086, 0x03, 0x00);
+	IOPCIDevice *gpu = xg_find_igpu();
 	IOMemoryMap *mm = gpu ? gpu->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0, kIOMapInhibitCache) : nullptr;
 	int rc = -6;
 
@@ -357,6 +366,8 @@ xg_gt_check(void)
 		rc = -5;
 	else if (rc == 1 && (st.guc_status != 10 || !st.guc_submission))
 		rc = -62;	/* 10 is INTEL_UC_FIRMWARE_RUNNING */
+	/* xegfx.gtawake=1|2: zep245's whole-Mac freezes stopped only with forcewake held on all domains (I-116) */
+	int awake = rc != 1 ? 0 : xg_i915_gtawake(xg_env_has("xegfx.gtawake=2") ? 2 : xg_env_has("xegfx.gtawake=1") ? 1 : 0);
 	if (d) {
 		xg_put(d, "gts", st.gts, 8);
 		xg_put(d, "wedged", st.wedged, 8);
@@ -367,6 +378,7 @@ xg_gt_check(void)
 		xg_put(d, "gsc-fw-status", (uint32_t)st.gsc_status);
 		xg_put(d, "engines", st.engines, 8);
 		xg_put(d, "render-minor", (uint32_t)st.render_minor);
+		xg_put(d, "gtawake-gts", (uint32_t)awake);
 		xg_put(d, "result", (uint32_t)rc);
 		if (gResident)
 			gResident->setProperty("XeGfxGt", d);
@@ -383,7 +395,7 @@ xg_gt_check(void)
 static int
 xg_accel_claim(void)
 {
-	IOPCIDevice *gpu = xg_find_pci(0x8086, 0x03, 0x00);
+	IOPCIDevice *gpu = xg_find_igpu();
 
 	if (gpu == nullptr)
 		return -19;
@@ -481,7 +493,7 @@ xg_run_stage(int s)
 		if (s == 3) {
 			/* every IOPCIDevice into newbus (config reads only), then vgapci on the Intel display function so
 			 * stage 4's drm drivers have a device to probe; the old PCI personality used to trigger this */
-			IOPCIDevice *gpu = xg_find_pci(0x8086, 0x03, 0x00);
+			IOPCIDevice *gpu = xg_find_igpu();
 			int err = gpu ? xg_pci_xnu_start(gpu) : ENODEV;
 			OSSafeReleaseNULL(gpu);
 			rc = err ? -err : 1;
@@ -498,7 +510,8 @@ xg_run_stage(int s)
 			if (rc == 1 && gPipeLit && gBootSurf && xg_boot_fb_size) {
 				int err = xg_i915_reserve_bootfb(gBootSurf, xg_boot_fb_size);
 
-				IOLog("XeGfx: boot surface GGTT 0x%x + %llu reserved: %d\n", gBootSurf, xg_boot_fb_size, err);
+				IOLog("XeGfx: boot surface GGTT 0x%x + %llu reserved: %d%s\n", gBootSurf, xg_boot_fb_size, err,
+				    (err == -28 && gBootSurf >= 0xfee00000u) ? " (expected: i915 keeps the range above the GuC top)" : "");
 				/* -ENOSPC at or above GUC_GGTT_TOP is i915's own GuC-top reservation, which keeps it free (N-256) */
 				if (err == -28 && gBootSurf < 0xfee00000u)
 					rc = -28;	/* something else sits there: compositing into it would overwrite it */
@@ -812,6 +825,9 @@ xg_vsnprintf(char *out, size_t len, const char *fmt, va_list ap)
 	va_list aq;
 	int n;
 
+	/* as FreeBSD's kvprintf: lkpi_pci_get_class names a kobject after a driverless device, whose nameunit is NULL */
+	if (fmt == nullptr)
+		fmt = "(fmt null)";
 	va_copy(aq, ap);
 	if (!xg_has_pext(fmt)) {
 		n = vsnprintf(out, len, fmt, aq);

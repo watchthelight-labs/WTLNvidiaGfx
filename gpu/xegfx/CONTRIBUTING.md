@@ -6,7 +6,8 @@ Thanks for looking. This is an experiment, so the most valuable things right now
 
 What helps most is the read-only probe (stage 2) on Intel Xe hardware other than the one Arrow Lake laptop it was written on. It only reads registers. Even so, run it only if you can recover your Mac from a hang (a power button press and a normal boot are enough, because nothing loads XeGfx at boot).
 
-1. Build from the NvGfx `xe` branch (`build/nvgfx/build_xegfx.sh`), install with `sudo gpu/xegfx/tools/install.sh` and reboot once so the auxiliary collection includes it.
+1. Build with `build/build_xegfx.sh`, install with `sudo tools/install.sh` and reboot once so the auxiliary collection includes it.
+   Without building: unzip the release zip into an `out` folder in a clone of this repo (`mkdir out && unzip ~/Downloads/XeGfx-<version>.zip -d out`), then run `sudo tools/install.sh` and reboot. On macOS 26 the kext can't be loaded straight from a folder; it has to be in the auxiliary collection first, which is what the install script and the reboot do.
 2. `sudo kmutil load -b org.watchthelight.XeGfx`, then `sudo sysctl debug.xegfx_stage=2`.
 3. Open an issue with your CPU, GPU device ID (`ioreg -l | grep -i '"device-id"'` on the `IGPU` or `GFX0` entry), macOS build, BIOS graphics mode, and the output of `ioreg -l -w0 -r -c XeGfxResident` and `sysctl -b debug.xegfx_log`.
 
@@ -23,7 +24,7 @@ Please do not run stage 4 on a machine you depend on yet. It starts i915 on your
 
 ## Where to send changes
 
-The shim, harness and checks are developed here and pulled into NvGfx's `xe` branch. Changes to the Metal plugin, the accelerator or the overlay go to [NvGfx](https://github.com/watchthelight-labs/NvGfx) on the `xe` branch. Open an issue first for anything larger than a fix, so we do not duplicate work.
+The shim, harness and checks are developed here and pulled into NvGfx's `xe` branch. Changes to the Metal plugin, the accelerator or the overlay go to [WTLNvidiaGfx](https://github.com/watchthelight-labs/WTLNvidiaGfx) on the `xe` branch. Open an issue first for anything larger than a fix, so we do not duplicate work.
 
 ## Questions
 
