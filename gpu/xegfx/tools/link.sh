@@ -42,7 +42,8 @@ fi
 codesign -s - -f "$ROOT/out/XeGfx.kext" >/dev/null 2>&1 || true
 echo "XeGfx.kext $(stat -f %z "$B/MacOS/XeGfx") B"
 # NO_LINKCHECK=1 skips the checks that read kernel collections: none of those reads while an XeGfx kext is loaded
-# (I-116). Compare `nm -u` and `nm -gU` with the last checked build instead.
+# (I-116). kpi_split.py above then works from the export list it saved on an earlier run. Compare `nm -u` and
+# `nm -gU` with the last checked build instead.
 if [ -z "${NO_LINKCHECK:-}" ]; then
 python3 ~/src/kcabi/linkcheck.py "$ROOT/out/XeGfx.kext" | tail -25
 # every undefined symbol must resolve from a declared, public KPI library (kmutil enforces this when it builds a
