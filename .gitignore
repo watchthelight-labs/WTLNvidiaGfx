@@ -6,3 +6,7 @@ __pycache__/
 
 # Cargo build output: never committed.
 translator/translator/target/
+# <wtl>
+tools/nvgfx-smi/nvgfx-smi
+tools/nvgfx-burn/nvgfx-burn
+# </wtl>
