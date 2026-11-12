@@ -1,182 +1,66 @@
-# NullMoth NVIDIA Driver for macOS
+# WTLNvidiaGfx
 
-A Metal driver for NVIDIA GeForce cards on macOS 15 Sequoia (Intel Macs and OpenCore PCs). It is open source; the
-kernel extensions, the Metal plugin and the shader translator are in this repository. The 1401 app that installs it
-(Mac and Windows) is its own project: [1401](https://github.com/nullmoth/1401).
+Renamed from `NvGfx` on 2026-10-31; the driver is still called NvGfx and the kexts keep their names. Old links redirect here.
+<!-- <wtl> fork: nvgfx | author: watchthelight </wtl> -->
 
-Supported cards are Turing and newer: GTX 16, RTX 20, 30, 40 and 50, TITAN RTX, Quadro RTX and the T-series. Most
-testing is done on an RTX 5060, so other cards may have problems that haven't been found yet. See
-[card support](docs/CARD-SUPPORT.md) for what has been reported working.
+NvGfx is my fork of [NullMoth's NVIDIA Metal driver for macOS](https://github.com/nullmoth/nvidia-macos-driver), kept for one machine: a Lenovo Legion 5 15IAX10 with an RTX 5070 Laptop GPU (`10DE:2D18`) driving its 2560x1600 165 Hz panel, running macOS Tahoe 26.7.x through OpenCore. All of the driver is NullMoth's work. The `nvgfx-2.9` branch carries my changes on top of their 2.9 (2.9-nvgfx.1, built and not yet booted); `nvgfx-2.6.2` is the last line that has booted (2.6.2-nvgfx.1 on 26.7.1 on 2026-10-27 and on 26.7.2 on 2026-10-28); `nvgfx` is the older line on 2.1.0, kept as the rollback and for its trace tooling. The upstream README is kept as [README.upstream.md](README.upstream.md), and `main` mirrors upstream unchanged.
 
-- Changes: [CHANGELOG.md](CHANGELOG.md), downloads on the [releases page](https://github.com/nullmoth/nvidia-macos-driver/releases)
-- Problems: [troubleshooting](docs/TROUBLESHOOTING.md), then Send logs from the 1401 app
-- Installing macOS from Windows: [1401](https://github.com/nullmoth/1401)
-- How it works: [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)
-- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+Required Notice: Copyright (c) 2026 NullMoth Systems (https://nullmothsystems.com)
 
-If your PC doesn't boot macOS with OpenCore yet, set that up first with the
-[OpenCore Install Guide](https://dortania.github.io/OpenCore-Install-Guide/), then install the driver.
+This is source-available, not open source: the driver is under the PolyForm Noncommercial License 1.0.0 (`LICENSE`), so you may use, change and share it for noncommercial purposes only. Third-party parts keep their own terms (`NOTICE`).
 
-Support the work: https://buymeacoffee.com/nullmoth
+## Intel Xe (branch `xe-2.6.2`)
 
-| | |
-|---|---|
-| macOS | 15.5 Sequoia or later (tested 15.7.x and 15.8.1), or 26 Tahoe, x86_64 |
-| GPUs | NVIDIA Turing and later; developed on an RTX 5060 |
-| Metal | Metal 3: argument buffers tier 2, ray tracing, mesh shaders, MPS, MetalFX path |
-| Also | OpenGL (through Apple's GL-on-Metal), OpenCL, Core Image, Core ML |
+Work on Intel graphics happens on the [`xe-2.6.2` branch](https://github.com/watchthelight-labs/WTLNvidiaGfx/tree/xe-2.6.2) (the older [`xe`](https://github.com/watchthelight-labs/WTLNvidiaGfx/tree/xe) branch holds the earlier work): a kernel driver for Intel Xe GPUs ([WTLIntelGfx](https://github.com/watchthelight-labs/WTLIntelGfx), Linux i915 through FreeBSD's [drm-kmod](https://github.com/freebsd/drm-kmod)), Mesa's [ANV](https://gitlab.freedesktop.org/mesa/mesa) Vulkan driver, and this plugin on top. On the Legion, WindowServer now composites the desktop on the Intel GPU (macOS 26.7.1 and 26.7.2); it is still a test driver and drawing bugs are being fixed. The [WTLIntelGfx README](https://github.com/watchthelight-labs/WTLIntelGfx) has the current status and downloads. [docs/XE.md](https://github.com/watchthelight-labs/WTLNvidiaGfx/blob/xe-2.6.2/docs/XE.md) on that branch has the layout and build notes, though its status line dates from 2026-10-21. Collaborators and testers with Intel Xe machines are welcome.
 
-## How it works
+## What the fork changes
 
-```
-Metal app ─► NVMTLDriver.bundle ─► translator (Apple AIR → SPIR-V) ─► NVK (Mesa Vulkan + NAK compiler) ─► kexts ─► GPU
-```
+NullMoth 2.9 carries most of what this fork used to add, so the 2.9 branch is small. What is still mine:
 
-| Component | Path on disk | Source |
+| Change | Where | State |
 |---|---|---|
-| Metal driver plugin | `/Library/GPUBundles/NVMTLDriver.bundle` | `plugin/` |
-| Shader translator | inside the plugin (`libnvmtl_translate.dylib`) | `translator/` (LGPL-3.0, based on metal2vulkan) |
-| Vulkan back end (NVK) | `/Library/GPUBundles/nvmtl/` | `nvk/nvk-macos.patch` and the chain in `build/build_nvk.sh` on Mesa `90a959eb` (26.3.0-rc3) |
-| Kernel extensions | `/Library/Extensions/NVRM, NVAccel, NVRMFB, NVRMAGDC` | `kexts/` |
-| GPU firmware (GSP) | `/Library/NullMoth/nvfw/nvidia/620.70.06` | NVIDIA, unmodified; fetched from NVIDIA's driver package at install (`package/fw_fetch.sh`) |
+| `nvrmphysctl=1`: a root-only escape on the NVRM user client that issues one RM control through the GSP, for `nvgfx-smi --phys` and `--ctrl`. Upstream deliberately has no such entry | `kexts/NVRM/nvrm_physctl.c`, `nvrm_physctl_abi.h`, the `NVRM_ESC_PHYS_CTRL` case in `NVRM.cpp` | builds, matches the shipped 2.9 NVRM in every other function |
+| `nvgfx-smi`: read-only telemetry (power limit and draw, clocks, pstate, temperature, throttle reasons) through the RM's shared data; `nvgfx-burn`: a Metal load generator; `nvgfx-boost`: a daemon that holds or drops the system-wide boost request | `tools/nvgfx-smi`, `tools/nvgfx-burn`, `tools/nvgfx-boost` | work |
+| Build and package scripts that use upstream's own `build/` scripts and check the result against the shipped binaries; `package.sh` swaps the builds into NullMoth's installer package | `build/nvgfx/` | works |
+| `build_kms620.sh` drops `-mfunction-return=thunk-extern`: 620's NVKMS adds the Linux return thunk, XNU exports no `__x86_return_thunk`, and a kext built with it would not link at load | `build/build_kms620.sh` | needed for any NVRM built from the published scripts |
 
-The kernel side runs NVIDIA's own open GPU kernel modules (r610) under macOS. NVRMFB is the display framebuffer,
-NVAccel the accelerator WindowServer composites through, NVRMAGDC the display-policy shim.
+What the fork used to carry and NullMoth has now (their `NOTICE` says the power budget, the GPS and NVPCF answers, the panel proxy head and the two A/B switches follow ideas first published here and that the code is theirs; the other items are in their changelog): the notebook power budget (`nvrmtgp=1`, `nvrmgps=1`, `nvrmnvpcf=1`; the sysctls are `debug.nvrm_tgp_*` now), the Intel panel proxy head (`nvfbigpu=1`), the boot hold ceiling (`nvrmholdcap`), the shader cache work (fallback folder, cache I/O queue), the repeated-pipeline skip and the sampler-variant memo with their two A/B switches, the HiDPI flag on scaled modes, the sampler restore, the Dock badge mip fill, the function-table pipeline link, and GeekAudio's translator change. The event-driven present path and the Terminal overdraw fix live only on the `nvgfx` branch (2.1.0).
 
-## Install — by hand
+The notes in `notes/` are the working record. `NVGFX.md` lists the switches and what each package label contains.
 
-Use the 1401 Mac app below unless you manage your OpenCore config yourself. `install.sh` installs the driver files but
-does not change OpenCore, and the driver does not start until OpenCore has these settings:
+## What it can't do
 
-- `boot-args` include `nvfb=1 nvaccel=1 nvfbheads=4 -nvkmsnosmooth amfi_get_out_of_my_way=0x1 amfi=0x80
-  ipc_control_port_options=0`, and not `nv_disable=1` or `-wegnoegpu` (both hide the NVIDIA card)
-- `csr-active-config` includes the bits `0x0A43`
-- `Misc > Security > SecureBootModel` is `Disabled`
-- `Lilu.kext` and `AMFIPass.kext` are in `Kernel > Add` and enabled
+- It is tested on one GPU, one panel and one laptop. Nothing here is a general release.
+- It does not ship packages. You need NullMoth's 2.9 package (for the installer and the Mac app) and swap in the builds from this tree with `build/nvgfx/package.sh`. NullMoth no longer ships the GSP firmware, so `package.sh` can carry NVIDIA's firmware over from an older package (`NVGFX_FW_FROM`) instead of letting the installer download it.
+- No sleep and wake (the laptop runs with sleep disabled).
+- Upstream's `AGENTS.md` and `CONTRIBUTING.md` are NullMoth's rules for their repository and are kept as they wrote them.
 
-Download `nullmoth-nvidia-<version>.tar.gz` from **Releases**, then:
+## Building
 
-```bash
-tar -xzf nullmoth-nvidia-*.tar.gz && cd pkgroot
-shasum -a 256 -c SHA256SUMS
-sudo ./install.sh
-sudo shutdown -r now
+Everything builds on macOS with the Xcode Command Line Tools and a few dependencies kept outside the tree: NVIDIA's open-gpu-kernel-modules at tag `620.70.06`, Vulkan-Headers for the plugin, and rustup stable for the translator. The kexts are built with the 15.5 SDK (`SDKROOT`), the plugin with the macOS 26 SDK and a macOS 15.0 deployment target.
+
+```
+build/build_rm620.sh <work> <620.70.06 tree>   # RM core, patch chain applied (upstream's script)
+build/build_kms620.sh <work>                   # NVKMS archive (drops the return thunk, see above)
+build/build_nvrm.sh kexts/NVRM <work>/ogkm-620.70.06 <out>/nvrm   # builds nvrm_physctl.c in too
+build/fb_build.sh kexts <out>/nvrmfb           # NVRMFB.kext
+build/accel_build_all.sh kexts/NVRM <out>/nvaccel   # NVAccel.kext for macOS 15 and 26
+build/nvgfx/build_plugin.sh                    # NVMTLDriver (RELEASE=1 for the shipped flags)
+build/nvgfx/build_xlate.sh                     # libnvmtl_translate
+REF=<2.9 pkgroot> NVGFX_NVRM=... build/nvgfx/package.sh 2.9-nvgfx.N   # installer package with the builds swapped in
 ```
 
-Every file must say OK in the check. `install.sh` copies the files and rebuilds the Auxiliary Kernel Collection; the
-restart is required, because logging out does not load the driver. (Paste the lines without anything after them: the
-Terminal on macOS does not treat `#` as a comment, so a pasted comment becomes part of the command.)
+Built from this tree, NVRMFB and both NVAccel kexts are byte for byte the shipped 2.9 ones; NVRM differs from the shipped one in the escape function and the added export only (`build/nvgfx/nvrm/compare_nvrm.py`).
 
-macOS asks you to **allow the extensions** in System Settings → Privacy & Security the first time. Allow, then reboot again.
+## Installing and rolling back
 
-## 1401 Mac app (recommended)
+Install the package `package.sh` produces with NullMoth's own `install.sh`; it backs up what it replaces. Rolling back is NullMoth's `uninstall.sh`, or installing an earlier package again. Boot-args, sysctls and environment switches are in `NVGFX.md`; with none of them set the fork's kexts behave like upstream.
 
-Download the latest `1401-Mac-<version>.dmg` from **Releases**, open it, and run **1401** (the driver package is inside the disk
-image, so nothing else to download). Follow its steps. A supported setup must use a verified or explicitly selected OpenCore partition. The app finds the OpenCore that started your Mac (in `EFI/OC` or `EFI/BOOT`, on an
-EFI or FAT32 partition), shows every change before making it, backs the config up, installs the driver, and adds
-**1401: Remove NVIDIA driver** to the OpenCore boot picker. Choosing that entry removes the driver at the next start and
-puts the Mac back exactly as it was before the install, OpenCore config included, then restarts by itself. The app also
-maps your USB ports and, if the driver ever crashes the Mac, offers to make a crash report you can upload yourself
-(it never sends anything on its own).
+## Credits and licence
 
-If something goes wrong, open 1401 > Crash report > Send logs to NullMoth. It uploads what 1401 did, the driver's
-state, crash reports and OpenCore's startup log, with names, serial numbers and addresses removed, and gives you a
-report ID to put in your issue or in Discord.
+NullMoth Systems wrote the driver. Third-party parts, per `NOTICE`: NVIDIA's open GPU kernel modules (MIT / GPL-2.0), Mesa NVK (MIT), metal2vulkan by Anees Iqbal (LGPL-3.0 or later, the base of `translator/`), NVIDIA GSP firmware under NVIDIA's firmware licence. The fork, like upstream, is under the PolyForm Noncommercial License 1.0.0.
 
-Keep the USB stick or disk that OpenCore started from plugged in while the app runs, and for every restart after:
-that is the config the app changes. The app never copies OpenCore to your internal disk. The first start with the
-driver pauses for up to a minute at "PCI configuration end" while the GPU comes up.
-
-## Wiring into an existing OpenCore setup
-
-The kexts install into `/Library/Extensions` and load from the Auxiliary Kernel Collection — **do not** also inject
-them from `EFI/OC/Kexts`. OpenCore only needs to set SIP and boot-args.
-
-**`NVRAM → Add → 7C436110-AB2A-4BBB-A880-FE41995C9F82`**
-
-| Key | Value | Why |
-|---|---|---|
-| `csr-active-config` | `<430A0000>` (Data) | the tested value: unsigned kexts, plus what root patches need |
-| `boot-args` | `nvfb=1 nvaccel=1 nvfbheads=4 -nvkmsnosmooth amfi_get_out_of_my_way=0x1 amfi=0x80 ipc_control_port_options=0` | framebuffer + accelerator, 4 display heads; the AMFI args let WindowServer load the driver bundle |
-
-Optional boot arguments, for troubleshooting:
-
-| boot-arg | Effect |
-|---|---|
-| `-nvrmnoflip` | keeps the composited frame on the copy path: NVRM never turns on zero-copy scan-out (`debug.nvaccel_iop_flip`), so the display reads a finished copy instead of the surface the GPU may still be drawing. Try it first when the desktop flashes or tears while the cursor moves. |
-| `-nvrmnogo` | the driver idles until `nvrmctl go <pass>` instead of starting the GPU itself. |
-| `-nvrmnobootscreen` | do not snapshot the boot screen. |
-| `-nvrmnopm` | turns off system sleep support: NVRM stays out of the power tree, as before it had one. A Mac that sleeps then comes back without the GPU. See [docs/SLEEP-WAKE.md](docs/SLEEP-WAKE.md). |
-
-Add every key you set to `NVRAM → Delete` as well, so the values are rewritten each boot.
-
-| Setting | Value | Why |
-|---|---|---|
-| `UEFI → Quirks → ResizeGpuBars` | keep the existing value | Forced resizing can stop firmware before the picker; `-1` preserves firmware sizing |
-| `Booter → Quirks → ResizeAppleGpuBars` | keep the existing value | Large firmware BARs can stop PCI configuration; `0` is the installer-safe small-BAR setting |
-| `Kernel → Block` | `com.apple.iokit.IONDRVSupport`, Strategy `Exclude` | otherwise the firmware framebuffer takes display index 0 from NVRMFB |
-| `Misc → Security → SecureBootModel` | `Disabled` | Apple Secure Boot refuses kexts Apple did not sign |
-
-The macOS **installer** uses `ResizeAppleGpuBars` `0`, `ResizeGpuBars` `-1`, and IONDRVSupport
-not excluded: it runs on the firmware framebuffer. The Mac app keeps your existing BAR settings when it installs or
-updates the driver, and the driver sets up the BAR itself after macOS starts, so don't copy BAR values from someone
-else's board.
-
-Also required:
-- **BIOS:** Above 4G Decoding ON (the card maps memory above 4 GB), CSM OFF.
-- **SMBIOS:** a Mac model that runs macOS 15 with a discrete GPU (tested: `iMacPro1,1`, which 1401 uses).
-- **Remove** any `nv_disable=1`, WhateverGreen NVIDIA patches, or `agdpmod=pikera` for this card.
-- **With WhateverGreen installed** (for an Intel or AMD GPU), add `gfxrst=4` to boot-args. Without it, WhateverGreen's
-  boot screen copy can read freed memory when the NVIDIA display opens, and the Mac panics.
-- **No `DeviceProperties`** are needed for the NVIDIA card.
-
-Verify after the reboot:
-
-```bash
-kmutil showloaded --list-only | grep nullmoth
-system_profiler SPDisplaysDataType | head -20
-```
-
-The first shows 4 lines; the second shows your GeForce with Metal: supported.
-
-## Dual boot
-
-Nothing in the driver touches other disks. OpenCore's picker boots Windows (`ScanPolicy` 0 or including NTFS) and Linux
-(`OpenLinuxBoot.efi` in `UEFI → Drivers`, `LauncherOption = Full`) alongside macOS.
-
-## Uninstall
-
-```bash
-sudo ./uninstall.sh && sudo shutdown -r now
-```
-
-## Build from source
-
-Requires Xcode 16, Rust (stable), Meson/Ninja, and NVIDIA's `open-gpu-kernel-modules` at tag `620.70.06`.
-
-```bash
-build/build_xlate.sh
-RELEASE=1 build/build_plugin.sh
-build/build263.sh
-build/accel_build.sh <src> <out>
-build/accel_build_all.sh kexts/NVRM <out>
-```
-
-In order: the translator (`libnvmtl_translate.dylib`); the plugin (`NVMTLDriver.bundle`; `RELEASE=1` strips every
-diagnostic); NVK (`build/build_nvk.sh`: the patch chain on Mesa `90a959eb`, 26.3.0-rc3); the kexts; and NVAccel for macOS 15 and 26
-(`NM_TAHOE=1`), written to `<out>/15` and `<out>/26`.
-
-Rebuild both accelerators whenever `nvrm_vram_abi.h` or `nvrm_gpuva_abi.h` changes: an accelerator built against an
-older ABI loads, but NVRMFB refuses all its VRAM requests and the desktop stays black.
-
-## License
-
-Free of charge, source code included. Nobody may sell it or use it to make money.
-
-- `plugin/`, `kexts/`, `build/`, `package/`: PolyForm Noncommercial 1.0.0 (see `LICENSE`), © NullMoth Systems.
-  Personal, research, educational and non-profit use is allowed; any commercial use is not.
-- `translator/`: LGPL-3.0-or-later (see `translator/LICENSE`): it is based on metal2vulkan, whose licence carries over.
-- `nvk/`: changes to Mesa (MIT).
-- GSP firmware: NVIDIA's redistributable firmware licence.
-
-See `NOTICE` for third-party credits.
+Projects we learned from:
+- GeekAudio wrote the translator change in [nullmoth PR #385](https://github.com/nullmoth/nvidia-macos-driver/pull/385) (immutable local pointer fields), taken here with their commits as they are; it makes MPSGraph's depthwise convolution translate.
+- ccyykk666 found why the Dock blur turns into blocks ([nullmoth #363](https://github.com/nullmoth/nvidia-macos-driver/issues/363)): a shader's own sampler overwrote the app's sampler slot. The fix here follows their description.
+- [thanhnndev/nvidia-macos-driver](https://github.com/thanhnndev/nvidia-macos-driver): an AppleGraphicsDeviceControl service for a non-NVIDIA panel (NMXAGDC), the 0x2001 client-set reply CoreDisplay waits for before it sends display-pipe transactions, and why WindowServer must keep the accelerator that owns the main display.

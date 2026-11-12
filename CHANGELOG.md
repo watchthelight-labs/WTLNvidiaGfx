@@ -1,5 +1,112 @@
 # Changelog
 
+## 2.9-nvgfx.1 (fork, built, not yet booted)
+
+- Rebased onto NullMoth 2.9 (branch `nvgfx-2.9`, from the v2.9 tag), still NVIDIA 620.70.06. NullMoth 2.9 reimplements most
+  of what this fork still carried on 2.8.1: the notebook power budget (`nvrmtgp`, `nvrmgps`, `nvrmnvpcf`), the Intel
+  panel proxy head (`nvfbigpu`), and the repeated-pipeline skip and sampler-variant memo with `NVMTL_NO_PSO_SKIP` and
+  `NVMTL_NO_SV_MEMO`. Their `NOTICE` says these follow ideas first published here and that the code is theirs, so the
+  fork's copies are dropped. The TGP sysctls are `debug.nvrm_tgp_*` now.
+- Still the fork's own: the `nvrmphysctl=1` control escape in NVRM, `nvgfx-smi`, `nvgfx-burn`, `nvgfx-boost`, and the
+  build scripts under `build/nvgfx`.
+- The shader cache I/O queue is upstream's own (commit 67a21ef, already in 2.8.1) and stays in 2.9, so there was no
+  separate async write to carry or drop. 2.9 adds a whole-file check to every cache entry and a warm-up of recorded Core
+  Animation variants after login (`NVMTL_FCWARM_OFF=1` turns it off).
+- NVRM, NVRMFB and NVAccel are built with upstream's own scripts now (`build_rm620.sh`, `build_kms620.sh`,
+  `build_nvrm.sh`, `fb_build.sh`, `accel_build_all.sh`). NVRMFB and both NVAccel kexts are byte for byte the shipped 2.9
+  ones. NVRM matches the shipped one in 28805 of 28806 functions; the one that differs is the user client's escape
+  function (the `nvrmphysctl` case), and the one added export is `rm_nvgfx_phys_control`.
+- `build_kms620.sh` drops `-mfunction-return=thunk-extern`. Built as published, 620's NVKMS makes NVRM import
+  `___x86_return_thunk`, which XNU does not export, so the kext could not link at load. The shipped NVRM has no such import.
+- `package.sh`: the 2.9 package carries no GSP firmware and its installer would download NVIDIA's 550 MB driver package.
+  `NVGFX_FW_FROM=<older pkgroot>` carries the 620.70.06 files over after checking them against the pins in the package's
+  own `fw_fetch.sh`. SHA256SUMS is rebuilt from the tree, because the 2.9 installer refuses a package with an unlisted
+  file (NVGFX-VERSION, the firmware and a kext signature are ours). NMXAudio is still left out unless `NVGFX_AUDIO=1`.
+- `build_plugin.sh` adds `-Werror=unguarded-availability-new` as upstream's release build does; the plugin is minos 15.0
+  and compiles with no warnings.
+- Not booted. The package is `2.9-nvgfx.1`; NullMoth 2.9 and the fork's NVRM have not run on 25G342 or 25G416.
+
+## 2.8.1-nvgfx.1 (fork, built, never booted, superseded by 2.9-nvgfx.1)
+
+- Rebased onto NullMoth 2.8.1 (branch `nvgfx-2.8.1`). Upstream now carries most of the fork's plugin and translator
+  work, so those commits dropped out: the shader cache folder fallback, the per-module memo, the cache I/O queue, the
+  refused-link memo, the asynchronous IOSurface upload, the repeat-pipeline skip, the HiDPI flag on scaled modes, the
+  sampler restore, the buffer memory type, and GeekAudio's translator changes.
+- Still the fork's own: the NVRM power glue (`nvrmtgp`, `nvrmgps`, `nvrmnvpcf`, `nvrmphysctl`), the Intel panel proxy
+  head in NVRMFB (`nvfbigpu=1`, off by default, merged into upstream's new mode list code), the render encoder's
+  sampler-variant memo, the two A/B switches `NVMTL_NO_PSO_SKIP` and `NVMTL_NO_SV_MEMO`, the build harness and the
+  tools.
+- `build_plugin.sh` builds upstream's DLSS sources and links MetalFX. The plugin needs the macOS 26 SDK from 2.8 on;
+  the kext builds keep the 15.5 SDK. The release plugin compiles and carries upstream's feature markers.
+- NVRM rebuilt on NVIDIA 620.70.06 (`NVRM_TAG=620.70.06 build_nvrm.sh`). Against the shipped 2.8.1 kext the load
+  commands are identical and 28744 of 28755 functions have the same size; the rest is the fork's power code. NVAccel
+  for macOS 15 and 26 matches the shipped builds section for section.
+- `package.sh` leaves upstream's new NMXAudio.kext out unless `NVGFX_AUDIO=1`. The 2.8 installer adds it on macOS 26
+  whenever an HD Audio controller exists, which collides with a machine that already runs VoodooHDA.
+- Open: upstream 2.8 moved NVRM to NVIDIA 620.70.06. The NVRM harness, NVRMFB and NVAccel have not been built against
+  620 yet, so there is no package of this version.
+
+## 2.6.2-nvgfx.1 (fork, booted 2026-10-27)
+
+Booted on the Legion 5 15IAX10 (RTX 5070 Laptop, macOS 26.7.1 25G241, BIOS Discrete) on 2026-10-27 (N-294): Metal 3,
+1680x1050 HiDPI at 165 Hz. System Settings lists the scaled sizes, the Dock blur has no blocks, the MPSGraph depthwise
+test gives the right values through the installed plugin, and window drag plus typing in an OpenGL terminal showed no
+text jumping back. The plugin on that boot was the `xe-2.6.2` build, which contains every plugin change below.
+
+- Rebased onto NullMoth 2.6.2, still on NVIDIA 615.78.08. The fork's commits from 2.5.3-nvgfx.1 and 2.5.3-nvgfx.2
+  (async cache writes) and the Intel panel proxy head (`nvfbigpu=1`, off by default) carried over with no code
+  conflicts. NVRM rebuilt for 615.78.08 matches the shipped 2.6.2 NVRM in 30875 of 30884 functions, as on 2.5.3; NVAccel
+  is upstream's, unchanged.
+- NVRMFB: scaled modes carry `kDisplayModeValidForHiResFlag`, so HiDPI "looks like" sizes reach the public mode list
+  (upstream #354). Built from source, the rest of NVRMFB is identical to the shipped 2.6.2 one.
+- Plugin: when a shader brings its own sampler (a constexpr sampler, or one read from an argument buffer), the translator
+  parks it in a sampler slot the shader leaves free. The app's sampler in that slot is now put back as soon as a shader
+  no longer needs it, as Metal requires. Core Animation binds a linear sampler for the Dock's blur upscale once, and the
+  upscale read a parked nearest sampler instead and drew 32x32 blocks (upstream #363, diagnosed by ccyykk666; our I-049).
+  `NVMTL_NO_SAMPLER_RESTORE=1` keeps the old behaviour.
+- Translator: GeekAudio's PR #385 (immutable local pointer fields forwarded after a dominating store). With it MPSGraph's
+  `depthwiseConv_3x3` translates and computes the right result on the RTX 5070; with the shipped translator the same
+  test aborts in `MPSKernel MTLComputePipelineStateCache` (Geekbench 6's CPU run hits this, our I-117). The new pass
+  only runs on a module whose first translation failed. All translator test targets that build from the published tree
+  give the same results as 2.6.2's, plus the PR's 11 new tests.
+- Plugin: `NVMTL_NO_PSO_SKIP=1` and `NVMTL_NO_SV_MEMO=1` (`nvrm610.conf`) turn off the skip of a repeated
+  setRenderPipelineState and the sampler-variant memo, to A/B a text glitch reported in Alacritty against them.
+
+## 2.5.3-nvgfx.2 (fork, not yet booted)
+
+- Plugin: shader cache files are written, and their last-use time touched, on one background queue instead of on the
+  thread that asked for the shader. WindowServer translated shaders and paid an fsync for each stored file on its
+  coreanimation.pipelines thread, which fits window drags at 11 to 28 flips/s for the first minutes after login
+  (upstream #370). Reads and the in-memory memo are unchanged, so a process still never reads or translates the same
+  shader twice. `NVMTL_CACHE_SYNC_IO=1` (environment, or a line in `nvrm610.conf`) puts the writes back on the caller
+  for an A/B. Each cache file's last-use time is touched once per process, and a process waits up to 2 s at exit for
+  its queued writes.
+- Plugin: the log now names the shader cache folder in use and, after 500 function-constant lookups (then every 2000),
+  how many were served from memory, from disk, or translated.
+
+## 2.5.3-nvgfx.1 (fork, booted 2026-10-22)
+
+- Rebased onto NullMoth 2.5.3, which moves NVRM to NVIDIA's 615.78.08 driver and GSP firmware. Upstream now carries
+  three things this fork used to: the boot hold that waits for the bring-up (our PR #317, `nvrmholdcap`), the
+  function-table pipeline link (#318) and desktop scaling at the head viewport (#273); the fork's copies are dropped.
+- NVRM rebuilt from source for 615 with the fork's power code (115 W TGP on AC, NVPCF and GPS `_DSM`, physctl):
+  `build_nvrm.sh` takes `NVRM_TAG` (default 615.78.08), drops NVKMS's `-mfunction-return=thunk-extern` (XNU exports no
+  `__x86_return_thunk`) and applies `615-viewport-scaling.patch`, which upstream's patch notes list but its published
+  completion script leaves out. The result matches the shipped 2.5.3 NVRM in 30875 of 30884 functions.
+- Plugin: upstream's host-import surface upload (#296) and the fork's asynchronous upload at bind live side by side;
+  an A/B is still to do.
+- Booted on the Legion 5 15IAX10 (RTX 5070 Laptop, macOS 26.7.1, BIOS Discrete): Metal 3, 1680x1050 HiDPI at 165 Hz,
+  115 W on AC, GSP bring-up 13 s (40 to 48 s on 610).
+
+## 2.4.3-nvgfx.1 (fork, not yet booted)
+
+- NVRM: the boot hold no longer lets WindowServer in while the card is still coming up. The cap used to fire at
+  settle + 40 s whatever the bring-up was doing; on a Legion 5 15IAX10 the GSP bring-up takes 2 to 48 s from one boot
+  to the next, and every boot over 40 s ended on software rendering (WindowServer asserted in CGXMappedDisplayStart,
+  the driver then refused to arm). The cap now waits in 10 s steps while go(2) runs, up to `nvrmholdcap=<s>` (40 to
+  600, default 120), and the log says how long go(2) took.
+- NVRM: the 115 W TGP mode follows the charger again (the 2.4.1 base caches the power source; the TGP tick refreshes
+  it before reading).
 ## 2.9
 
 2.9 is the last 2.x release for macOS 15 Sequoia and macOS 26 Tahoe. It carries every fix we had for both systems, on GTX 16 and RTX 20, 30, 40, and 50 cards, plus a large set of new features. New features that have not been proven on enough hardware are **off by default** and listed under "Experimental" below: you switch them on one at a time from the 1401 Mac app.
