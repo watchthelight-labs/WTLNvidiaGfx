@@ -41,6 +41,9 @@ if [ -f "$FW/mtl_guc_70.bin" ]; then
 fi
 codesign -s - -f "$ROOT/out/XeGfx.kext" >/dev/null 2>&1 || true
 echo "XeGfx.kext $(stat -f %z "$B/MacOS/XeGfx") B"
+# NO_LINKCHECK=1 skips the checks that read kernel collections: none of those reads while an XeGfx kext is loaded
+# (I-116). Compare `nm -u` and `nm -gU` with the last checked build instead.
+if [ -z "${NO_LINKCHECK:-}" ]; then
 python3 ~/src/kcabi/linkcheck.py "$ROOT/out/XeGfx.kext" | tail -25
 # every undefined symbol must resolve from a declared, public KPI library (kmutil enforces this when it builds a
 # collection; linkcheck only knows what the kernel exports)
@@ -54,6 +57,7 @@ for kc in "$HOME"/abi-src/*/kc/BootKernelExtensions.kc; do
   python3 "$ROOT/tools/shadow_check.py" "$ROOT/out/XeGfx.kext" --kc "$kc" | tail -1 | grep -q "ok" || {
     python3 "$ROOT/tools/shadow_check.py" "$ROOT/out/XeGfx.kext" --kc "$kc"; exit 1; }
 done
+fi
 # the userspace probe the guard runs after the stages; needs libdrm's uapi headers (XEGFX_DRM_INC)
 INC=${XEGFX_DRM_INC:-$HOME/src/xe-userland/drm/include/drm}
 if [ -f "$INC/i915_drm.h" ]; then

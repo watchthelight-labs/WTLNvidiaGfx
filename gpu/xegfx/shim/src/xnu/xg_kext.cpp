@@ -23,6 +23,7 @@
 #include "xg_i915.h"
 #include "xg_fd.h"
 #include "xg_vmap.h"
+#include "xg_fbreloc.h"
 
 extern "C" {
 void xg_start_stage(int stage);
@@ -463,6 +464,63 @@ xg_store_check(void)
 	return rc;
 }
 
+/* stage 4's framebuffer move: statuses of its own, clear of fbr_run's -1..-6 so debug.xegfx_results can tell them apart */
+#define XG_FBMOVE_MEM_OFF	(-80)	/* the iGPU's memory decoding is off */
+#define XG_FBMOVE_NO_BAR0	(-81)	/* BAR0 (registers and GGTT) did not map, or is shorter than 16 MiB */
+
+/*
+ * Stage 4, before i915 starts (WTLIntelGfx issue #13): the firmware's boot framebuffer must not cross GUC_GGTT_TOP,
+ * because i915 maps the GuC image at that top and pins rings just below it. Its GGTT entries are copied to a free
+ * range below it and PLANE_SURF follows at vblank (xg_fbreloc.h). No GPU driver has used the GGTT in this boot yet,
+ * so a target that holds an earlier boot's entries may be taken (FBR_RECLAIM).
+ * Returns 1 when nothing needed doing or the move worked, a negative errno-style value when the framebuffer is in the
+ * GuC area and could not be moved; stage 4 then stops before i915 starts.
+ */
+static int
+xg_fbmove_stage4(void)
+{
+	IOPCIDevice *gpu = xg_find_igpu();
+	IOMemoryMap *mm = nullptr;
+	struct fbr_result r;
+	char buf[320];
+	int rc = 1;
+
+	if (!gpu)
+		return -ENODEV;
+	if (!(gpu->configRead16(kIOPCIConfigCommand) & kIOPCICommandMemorySpace)) {
+		gpu->release();
+		return XG_FBMOVE_MEM_OFF;
+	}
+	mm = gpu->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0, kIOMapInhibitCache);
+	if (!mm || mm->getLength() < (16ull << 20)) {
+		OSSafeReleaseNULL(mm);
+		gpu->release();
+		return XG_FBMOVE_NO_BAR0;
+	}
+	fbr_run((volatile u8 *)mm->getVirtualAddress(), FBR_APPLY | FBR_RECLAIM, &r);
+	switch (r.status) {
+	case FBR_MOVED:
+	case FBR_NOT_NEEDED:
+		break;
+	case FBR_PIPE_OFF:
+	case FBR_PLANE_OFF:
+	case FBR_PTE_INVALID:
+	case FBR_BAD_SIZE:
+		/* no framebuffer to move: stage 4 goes on as before, its reserve step is skipped as before */
+		break;
+	default:
+		rc = r.status;	/* NO_TARGET, NO_LATCH: the framebuffer stays in the GuC area, so i915 must not start */
+		break;
+	}
+	snprintf(buf, sizeof(buf), "stage 4 boot framebuffer move: status %d, surf 0x%x -> 0x%x, size 0x%llx, pages %u%s",
+	         r.status, r.old_surf, r.new_surf, r.size, r.pages, r.reclaimed ? " (reclaimed)" : "");
+	IOLog("XeGfx: %s\n", buf);
+	gpu->setProperty("xegfx-fbmove", buf);
+	mm->release();
+	gpu->release();
+	return rc;
+}
+
 static int
 xg_run_stage(int s)
 {
@@ -486,6 +544,8 @@ xg_run_stage(int s)
 	}
 	if (s == 2) {
 		rc = xg_probe();
+	} else if (s == 4 && (rc = xg_fbmove_stage4()) < 0) {
+		/* the framebuffer is in the GuC area and was not moved: i915 does not start (see xg_fbmove_stage4) */
 	} else {
 		xg_start_stage(s);
 		if (s == 1 && xg_vm_vmap_selftest() != 0)
