@@ -68,7 +68,15 @@ OBJS+=("$OUT/nvrm_pageoff.o")
 # nvrm_pmgr.c (the notebook power-budget control) needs the GPU object too
 OGKM="$OGKM" python3 -B "$HERE/../kexts/NVRM/rmcc.py" "$SRC/nvrm_pmgr.c" "$OUT/nvrm_pmgr.o" 2>"$OUT/pmgr.err" || { echo "STOP: nvrm_pmgr.c did not compile"; tail "$OUT/pmgr.err"; exit 1; }
 OBJS+=("$OUT/nvrm_pmgr.o")
-bash "$HERE/warn_ceiling.sh" nvrm "$(cat "$OUT"/*.o.err "$OUT/kapi.err" "$OUT/pageoff.err" "$OUT/pmgr.err" | grep -c ': warning:')" || exit 4
+# <wtl> the fork's root-only RM control escape (kexts/NVRM/nvrm_physctl.c), built only where the source exists
+PHYSERR=/dev/null
+if [ -f "$SRC/nvrm_physctl.c" ]; then
+  PHYSERR="$OUT/physctl.err"
+  OGKM="$OGKM" python3 -B "$HERE/../kexts/NVRM/rmcc.py" "$SRC/nvrm_physctl.c" "$OUT/nvrm_physctl.o" 2>"$PHYSERR" || { echo "STOP: nvrm_physctl.c did not compile"; tail "$PHYSERR"; exit 1; }
+  OBJS+=("$OUT/nvrm_physctl.o")
+fi
+# </wtl>
+bash "$HERE/warn_ceiling.sh" nvrm "$(cat "$OUT"/*.o.err "$OUT/kapi.err" "$OUT/pageoff.err" "$OUT/pmgr.err" ${PHYSERR/\/dev\/null/} | grep -c ': warning:')" || exit 4
 xcrun clang++ -arch x86_64 -mmacosx-version-min=15.0 -fapple-kext -nostdlib -Xlinker -kext -lkmodc++ -lkmod -lcc_kext "${OBJS[@]}" \
   "$NV/_out/Darwin_x86_64/libnvkernel.a" "$KMSLIB" -o "$OUT/NVRM.kext/Contents/MacOS/NVRM" 2>"$OUT/link.err" || { echo "STOP: link failed"; grep -v "built for newer" "$OUT/link.err" | head; exit 1; }
 bash "$HERE/warn_ceiling.sh" nvrm-link "$(grep -c 'warning' "$OUT/link.err")" "$OUT/link.err" || exit 4

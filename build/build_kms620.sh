@@ -14,7 +14,9 @@ for l in sys.stdin:
     l = l.rstrip("\n")
     cc, rest = l.split(" ", 1)
     tool = {"cc": "clang", "c++": "clang++"}[cc]   # the DisplayPort library is C++
-    print(tool + " -arch x86_64 -mmacosx-version-min=15.0 -mkernel -DNV_DARWIN -fcf-protection=branch " + rest.replace(" -mcmodel=kernel", "").replace(" -fno-pic", ""))' > "$O/compile_cmds.sh"
+    print(tool + " -arch x86_64 -mmacosx-version-min=15.0 -mkernel -DNV_DARWIN -fcf-protection=branch " + rest.replace(" -mcmodel=kernel", "").replace(" -fno-pic", "").replace(" -mfunction-return=thunk-extern", ""))' > "$O/compile_cmds.sh"
+# <wtl> 620's NVKMS adds the Linux return thunk; XNU exports no __x86_return_thunk, so the kext would not link at load
+# (the shipped NVRM has none). The 615 harness dropped the flag the same way.
 n=$(wc -l < "$O/compile_cmds.sh" | tr -d " "); echo "modeset compile commands: $n"
 # the identity string is a make step (user@host and the date); write the shipped wording instead
 printf '%s\n' 'const char  NV_KMS_ID[] = "nvidia id: NVIDIA UNIX Open Kernel Mode Setting Driver for x86_64 '"$V"' Release Build (NullMoth Systems)";' \
