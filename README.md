@@ -3,7 +3,7 @@
 Renamed from `NvGfx` on 2026-10-31; the driver is still called NvGfx and the kexts keep their names. Old links redirect here.
 <!-- <wtl> fork: nvgfx | author: watchthelight </wtl> -->
 
-NvGfx is my fork of [NullMoth's NVIDIA Metal driver for macOS](https://github.com/nullmoth/nvidia-macos-driver), kept for one machine: a Lenovo Legion 5 15IAX10 with an RTX 5070 Laptop GPU (`10DE:2D18`) driving its 2560x1600 165 Hz panel, running macOS Tahoe 26.7.x through OpenCore. All of the driver is NullMoth's work. The `nvgfx-2.9` branch carries my changes on top of their 2.9 (2.9-nvgfx.1, built and not yet booted); `nvgfx-2.6.2` is the last line that has booted (2.6.2-nvgfx.1 on 26.7.1 on 2026-10-27 and on 26.7.2 on 2026-10-28); `nvgfx` is the older line on 2.1.0, kept as the rollback and for its trace tooling. The upstream README is kept as [README.upstream.md](README.upstream.md), and `main` mirrors upstream unchanged.
+NvGfx is my fork of [NullMoth's NVIDIA Metal driver for macOS](https://github.com/nullmoth/nvidia-macos-driver), kept for one machine: a Lenovo Legion 5 15IAX10 with an RTX 5070 Laptop GPU (`10DE:2D18`) driving its 2560x1600 165 Hz panel, running macOS Tahoe 26.7.x through OpenCore. All of the driver is NullMoth's work. The `nvgfx-3.0` branch carries my changes on top of their 3.0 (3.0-nvgfx.1, packaged and not yet booted); `nvgfx-2.9` is the last line that has booted (2.9-nvgfx.1 on the 26.7.3 beta 25G416 on 2026-11-14, never released); `nvgfx-2.6.2` is the last released one (2.6.2-nvgfx.1, booted on 26.7.1 on 2026-10-27 and on 26.7.2 on 2026-10-28); `nvgfx` is the older line on 2.1.0, kept as the rollback and for its trace tooling. The upstream README is kept as [README.upstream.md](README.upstream.md), and `main` mirrors upstream unchanged.
 
 Required Notice: Copyright (c) 2026 NullMoth Systems (https://nullmothsystems.com)
 
@@ -47,7 +47,7 @@ build/fb_build.sh kexts <out>/nvrmfb           # NVRMFB.kext
 build/accel_build_all.sh kexts/NVRM <out>/nvaccel   # NVAccel.kext for macOS 15 and 26
 build/nvgfx/build_plugin.sh                    # NVMTLDriver (RELEASE=1 for the shipped flags)
 build/nvgfx/build_xlate.sh                     # libnvmtl_translate
-REF=<2.9 pkgroot> NVGFX_NVRM=... build/nvgfx/package.sh 2.9-nvgfx.N   # installer package with the builds swapped in
+REF=<3.0 pkgroot> NVGFX_NVRM=... build/nvgfx/package.sh 3.0-nvgfx.N   # installer package with the builds swapped in
 ```
 
 Built from this tree, NVRMFB and both NVAccel kexts are byte for byte the shipped 2.9 ones; NVRM differs from the shipped one in the escape function and the added export only (`build/nvgfx/nvrm/compare_nvrm.py`).

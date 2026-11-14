@@ -13,24 +13,7 @@
 - Packaged as `pkg/3.0-nvgfx.1` with `package.sh` on the shipped 3.0 package root (SHA-256 checked against the release digest). The restart-line guard passed unchanged; `install.sh` differs from upstream's in the two restart lines only.
 - Not booted.
 
-## 3.0
-
-### Fixes
-- Processes that lost the GPU right after login on 2.9 (transparent Dock, icons that went missing, a lock screen that crashed in a loop, apps that crashed at launch): the GPU could read a small command before the driver's write of it was visible to it and stopped the process's channel. The memory those commands are written to is no longer cached by the GPU.
-- System Settings > Displays hanging for seconds when it opens (#567): a search of the shader text ran on every call; its answer is kept.
-- Apps built with an old SDK that crashed at launch on the NVIDIA device (Canon CaptureOnTouch #571, OpenCore Configurator #545): the system version they are told ("10.16") is read correctly, and a refused device no longer crashes the app.
-- Camera previews that stayed black (Photo Booth #568): 4:2:2 video textures are on by default, as on Apple's drivers (`NVMTL_YUV422=0` turns them off), and a per-frame shader scan is kept instead of repeated.
-- WindowServer spending time in the kernel while a video plays (#566): a surface is marked once per commit instead of once per texture per pass.
-- A shutdown or restart that hung: a GPU usage reading that does not come back stops the once-a-second sampler.
-- A buffer is never copied into a multisample image; the request is refused and named in the log.
-- A monitor that came up as a 1920x1080 television after some restarts, with its own resolutions missing until a cold start: the memory a display scans out of no longer depends on the first identification the monitor sends.
-- The uninstaller also removes the hybrid laptop panel drivers.
-
-### Experimental: older macOS releases
-- Driver kits for macOS 14 Sonoma down to Mac OS X 10.7 Lion, one per release, each compiled for that release and linked with that release's own kernel linker. None has been run on a card.
-- `install-legacy.sh` in each kit checks the kit, test-links it against the running system and prepares the GPU firmware before it changes anything. The display driver starts on `nvfb=1`; the accelerator stays off until `nvaccel=1` is added.
-
-## 2.9-nvgfx.1 (fork, built, not yet booted)
+## 2.9-nvgfx.1 (fork, booted 2026-11-14)
 
 - Rebased onto NullMoth 2.9 (branch `nvgfx-2.9`, from the v2.9 tag), still NVIDIA 620.70.06. NullMoth 2.9 reimplements most
   of what this fork still carried on 2.8.1: the notebook power budget (`nvrmtgp`, `nvrmgps`, `nvrmnvpcf`), the Intel
@@ -54,7 +37,10 @@
   file (NVGFX-VERSION, the firmware and a kext signature are ours). NMXAudio is still left out unless `NVGFX_AUDIO=1`.
 - `build_plugin.sh` adds `-Werror=unguarded-availability-new` as upstream's release build does; the plugin is minos 15.0
   and compiles with no warnings.
-- Not booted. The package is `2.9-nvgfx.1`; NullMoth 2.9 and the fork's NVRM have not run on 25G342 or 25G416.
+- Booted on 2026-11-14 on macOS 26.7.3 beta 25G416 with an RTX 5070 Laptop (Legion 5 15IAX10), panel on the NVIDIA GPU:
+  desktop up, Metal 4 reported, 165 Hz, 115 W limit through `nvrmtgp=1`, no crash reports. A scripted window drag gives
+  about 90 flips per second where 2.6.2-nvgfx.1 and earlier gave 147 to 148; the cause is open. Superseded by
+  3.0-nvgfx.1 before it was released.
 
 ## 2.8.1-nvgfx.1 (fork, built, never booted, superseded by 2.9-nvgfx.1)
 
@@ -137,6 +123,23 @@ text jumping back. The plugin on that boot was the `xe-2.6.2` build, which conta
   600, default 120), and the log says how long go(2) took.
 - NVRM: the 115 W TGP mode follows the charger again (the 2.4.1 base caches the power source; the TGP tick refreshes
   it before reading).
+
+## 3.0
+
+### Fixes
+- Processes that lost the GPU right after login on 2.9 (transparent Dock, icons that went missing, a lock screen that crashed in a loop, apps that crashed at launch): the GPU could read a small command before the driver's write of it was visible to it and stopped the process's channel. The memory those commands are written to is no longer cached by the GPU.
+- System Settings > Displays hanging for seconds when it opens (#567): a search of the shader text ran on every call; its answer is kept.
+- Apps built with an old SDK that crashed at launch on the NVIDIA device (Canon CaptureOnTouch #571, OpenCore Configurator #545): the system version they are told ("10.16") is read correctly, and a refused device no longer crashes the app.
+- Camera previews that stayed black (Photo Booth #568): 4:2:2 video textures are on by default, as on Apple's drivers (`NVMTL_YUV422=0` turns them off), and a per-frame shader scan is kept instead of repeated.
+- WindowServer spending time in the kernel while a video plays (#566): a surface is marked once per commit instead of once per texture per pass.
+- A shutdown or restart that hung: a GPU usage reading that does not come back stops the once-a-second sampler.
+- A buffer is never copied into a multisample image; the request is refused and named in the log.
+- A monitor that came up as a 1920x1080 television after some restarts, with its own resolutions missing until a cold start: the memory a display scans out of no longer depends on the first identification the monitor sends.
+- The uninstaller also removes the hybrid laptop panel drivers.
+
+### Experimental: older macOS releases
+- Driver kits for macOS 14 Sonoma down to Mac OS X 10.7 Lion, one per release, each compiled for that release and linked with that release's own kernel linker. None has been run on a card.
+- `install-legacy.sh` in each kit checks the kit, test-links it against the running system and prepares the GPU firmware before it changes anything. The display driver starts on `nvfb=1`; the accelerator stays off until `nvaccel=1` is added.
 
 ## 2.9
 

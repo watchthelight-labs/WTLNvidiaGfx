@@ -5,8 +5,8 @@ The `nvgfx-2.9` branch is NullMoth's 2.9 plus the few changes in the README tabl
 
 ## Branches and versions
 
-- `nvgfx-3.0` (rebase onto upstream 3.0, labels `3.0-nvgfx.N`; 3.0-nvgfx.1 compiles, not packaged, not booted): the six `nvgfx-2.9` commits on the v3.0 tag.
-- `nvgfx-2.9` (rebase onto upstream 2.9, labels `2.9-nvgfx.N`; 2.9-nvgfx.1 compiles, NVRM matches the shipped 2.9 NVRM except the escape function, not booted): see the changelog. NullMoth 2.9 is the last 2.x, on NVIDIA 620.70.06.
+- `nvgfx-3.0` (rebase onto upstream 3.0, labels `3.0-nvgfx.N`; 3.0-nvgfx.1 is packaged, not booted): the six `nvgfx-2.9` commits on the v3.0 tag.
+- `nvgfx-2.9` (rebase onto upstream 2.9, labels `2.9-nvgfx.N`; 2.9-nvgfx.1 compiles, NVRM matches the shipped 2.9 NVRM except the escape function, booted 2026-11-14 on 26.7.3 beta 25G416, not released): see the changelog. NullMoth 2.9 is the last 2.x, on NVIDIA 620.70.06.
 - `nvgfx-2.8.1` (rebase onto 2.8.1, never booted, superseded by `nvgfx-2.9`).
 - `nvgfx-2.6.2` (default until 2.9 has booted, booted 2026-10-27 as 2.6.2-nvgfx.1): the fork's changes on top of upstream 2.6.2,
   packages labelled `2.6.2-nvgfx.N`. Carries everything from `nvgfx-2.5.3`, adds the HiDPI flag on scaled modes (#354), the sampler restore (#363)
