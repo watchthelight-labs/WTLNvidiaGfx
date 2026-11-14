@@ -10,7 +10,7 @@
   with the 15.5 SDK. The RM core and NVKMS archives are the ones built for 2.9 (patch chain and `build_rm620.sh`,
   `build_kms620.sh` are unchanged in 3.0). Unresolved symbols of NVRM, NVRMFB and both NVAccel kexts are identical to the
   2.9 build; the plugin no longer imports `kIOMainPortDefault` (upstream's `nvmtl_avail.h`). NVRM has no `___x86_return_thunk` import.
-- Not packaged yet: `package.sh` needs the shipped 3.0 package root as `REF`, and that is not on this machine.
+- Packaged as `pkg/3.0-nvgfx.1` with `package.sh` on the shipped 3.0 package root (SHA-256 checked against the release digest). The restart-line guard passed unchanged; `install.sh` differs from upstream's in the two restart lines only.
 - Not booted.
 
 ## 3.0
