@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.0-nvgfx.1 (fork, built, not yet booted)
+
+- Rebased onto NullMoth 3.0 (branch `nvgfx-3.0`, from the v3.0 tag), still NVIDIA 620.70.06 with the same GSP firmware
+  pins. The six fork commits of `nvgfx-2.9` applied without a code conflict; upstream 3.0 took none of them (the
+  `nvrmphysctl` escape, the tools, `build/nvgfx` and the two build and package fixes are all still ours). The only
+  conflict was this changelog.
+- Built from `build_nvrm.sh`, `fb_build.sh`, `accel_build_all.sh`, `build/nvgfx/build_plugin.sh` and `build_xlate.sh`
+  with the 15.5 SDK. The RM core and NVKMS archives are the ones built for 2.9 (patch chain and `build_rm620.sh`,
+  `build_kms620.sh` are unchanged in 3.0). Unresolved symbols of NVRM, NVRMFB and both NVAccel kexts are identical to the
+  2.9 build; the plugin no longer imports `kIOMainPortDefault` (upstream's `nvmtl_avail.h`). NVRM has no `___x86_return_thunk` import.
+- Not packaged yet: `package.sh` needs the shipped 3.0 package root as `REF`, and that is not on this machine.
+- Not booted.
+
 ## 3.0
 
 ### Fixes
