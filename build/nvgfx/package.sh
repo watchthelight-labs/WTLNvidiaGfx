@@ -1,6 +1,6 @@
 #!/bin/bash
 # NvGfx: make an installable package from the shipped NullMoth pkgroot with our builds swapped in.
-#   REF  = shipped pkgroot (default: the audited 2.9 package under tooling/quarantine)
+#   REF  = shipped pkgroot (default: the audited 3.0 package under tooling/quarantine)
 #   OUT  = output pkgroot (default ~/src/NvGfx-build/pkg/<label>)
 #   Components to swap are given as env vars pointing at built files (unset = keep shipped):
 #     NVGFX_PLUGIN (NVMTLDriver), NVGFX_XLATE (libnvmtl_translate.dylib), NVGFX_NVK (libvulkan_nouveau.dylib),
@@ -13,7 +13,7 @@
 # <wtl> fork: nvgfx | author: watchthelight </wtl>
 set -euo pipefail
 LABEL=${1:?usage: package.sh <label, e.g. 2.1.0-nvgfx.1>}
-REF=${REF:-$HOME/Hackintosh/tooling/quarantine/nullmoth-release-2.9/x/pkgroot}
+REF=${REF:-$HOME/Hackintosh/tooling/quarantine/nullmoth-release-3.0/x/pkgroot}
 OUT=${OUT:-$HOME/src/NvGfx-build/pkg/$LABEL}
 R=$(cd "$(dirname "$0")/../.." && pwd)
 rm -rf "$OUT"; mkdir -p "$(dirname "$OUT")"; mkdir -p "$OUT"
