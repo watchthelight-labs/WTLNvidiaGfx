@@ -9,7 +9,7 @@
 #   NVGFX_FW_FROM=<pkgroot> carries NVIDIA's GSP firmware (Users/Shared/nvfw) from an older package: since 2.9 the shipped
 #     package has none and its installer would download NVIDIA's 550 MB driver package. Every file is checked against the
 #     pins in the package's own fw_fetch.sh first, and the files are added to SHA256SUMS.
-# The result keeps install.sh/uninstall.sh unchanged; SHA256SUMS, BASELINE-IDENTITY.json and NVGFX-VERSION are rewritten.
+# The result keeps install.sh/uninstall.sh as shipped except the two restarts (see below); SHA256SUMS, BASELINE-IDENTITY.json and NVGFX-VERSION are rewritten.
 # <wtl> fork: nvgfx | author: watchthelight </wtl>
 set -euo pipefail
 LABEL=${1:?usage: package.sh <label, e.g. 2.1.0-nvgfx.1>}
@@ -23,6 +23,16 @@ AUDIO_SKIP=(); [ "${NVGFX_AUDIO:-0}" = 1 ] || AUDIO_SKIP=(--exclude ./Library/Ex
 if [ "${NVGFX_AUDIO:-0}" != 1 ] && grep -q ' Library/Extensions/NMXAudio\.kext/' "$OUT/SHA256SUMS"; then
   grep -v ' Library/Extensions/NMXAudio\.kext/' "$OUT/SHA256SUMS" > "$OUT/SHA256SUMS.new" && mv "$OUT/SHA256SUMS.new" "$OUT/SHA256SUMS"
   echo "left out NMXAudio.kext (NVGFX_AUDIO=1 keeps it)"
+fi
+# 2.9's fallback job (lastgood) and boot guard each end in `shutdown -r now`. Our gpu-guard owns restarts and rollbacks for a
+# staged boot, so the package keeps the NVRAM bookkeeping and drops the two restarts (NVGFX_KEEP_UPSTREAM_RESTART=1 keeps them).
+# The first sits in the unquoted heredoc that writes lastgood.sh (so $ stays escaped), the second in the quoted boot-guard one.
+if [ "${NVGFX_KEEP_UPSTREAM_RESTART:-0}" != 1 ]; then
+  [ "$(grep -c '^shutdown -r now$' "$OUT/install.sh")" = 1 ] && [ "$(grep -c '^        shutdown -r now$' "$OUT/install.sh")" = 1 ] \
+    || { echo "FAIL install.sh restart lines changed upstream; re-read the boot guard"; exit 3; }
+  sed -e 's|^shutdown -r now$|echo "\\$(date) restart left to the gpu-guard" >> \\$LOG|' \
+      -e 's|^        shutdown -r now$|        echo "$(date) restart left to the gpu-guard" >> $LOG|' \
+      "$OUT/install.sh" > "$OUT/install.sh.new" && chmod 755 "$OUT/install.sh.new" && mv "$OUT/install.sh.new" "$OUT/install.sh"
 fi
 B=$OUT/Library/GPUBundles/NVMTLDriver.bundle
 swap_file() { [ -n "${1:-}" ] || return 0; cp "$1" "$2"; codesign -f -s - "$2" 2>/dev/null; echo "swapped $(basename "$2") <- $1"; }
