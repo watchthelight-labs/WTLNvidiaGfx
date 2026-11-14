@@ -17,7 +17,6 @@
 - Driver kits for macOS 14 Sonoma down to Mac OS X 10.7 Lion, one per release, each compiled for that release and linked with that release's own kernel linker. None has been run on a card.
 - `install-legacy.sh` in each kit checks the kit, test-links it against the running system and prepares the GPU firmware before it changes anything. The display driver starts on `nvfb=1`; the accelerator stays off until `nvaccel=1` is added.
 
-=======
 ## 2.9-nvgfx.1 (fork, built, not yet booted)
 
 - Rebased onto NullMoth 2.9 (branch `nvgfx-2.9`, from the v2.9 tag), still NVIDIA 620.70.06. NullMoth 2.9 reimplements most
@@ -125,7 +124,7 @@ text jumping back. The plugin on that boot was the `xe-2.6.2` build, which conta
   600, default 120), and the log says how long go(2) took.
 - NVRM: the 115 W TGP mode follows the charger again (the 2.4.1 base caches the power source; the TGP tick refreshes
   it before reading).
->>>>>>> eb14b62 (docs: 2.9-nvgfx.1, what is carried, dropped and new upstream)
+
 ## 2.9
 
 2.9 is the last 2.x release for macOS 15 Sequoia and macOS 26 Tahoe. It carries every fix we had for both systems, on GTX 16 and RTX 20, 30, 40, and 50 cards, plus a large set of new features. New features that have not been proven on enough hardware are **off by default** and listed under "Experimental" below: you switch them on one at a time from the 1401 Mac app.
