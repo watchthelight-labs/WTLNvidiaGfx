@@ -5,6 +5,8 @@
 #   Components to swap are given as env vars pointing at built files (unset = keep shipped):
 #     NVGFX_PLUGIN (NVMTLDriver), NVGFX_XLATE (libnvmtl_translate.dylib), NVGFX_NVK (libvulkan_nouveau.dylib),
 #     NVGFX_NVRM, NVGFX_NVRMFB, NVGFX_NVACCEL15, NVGFX_NVACCEL26 (.kext bundles)
+#     NVGFX_NMINTELFB (NMIntelFB.kext from kexts/NMIntelFB/build.sh): replaces every copy in the package. The shipped
+#       3.0 binary predates the two #555 fixes that are in this tree's source.
 #   NVGFX_AUDIO=1 keeps the shipped NMXAudio.kext (left out by default)
 #   NVGFX_FW_FROM=<pkgroot> carries NVIDIA's GSP firmware (Users/Shared/nvfw) from an older package: since 2.9 the shipped
 #     package has none and its installer would download NVIDIA's 550 MB driver package. Every file is checked against the
@@ -47,6 +49,12 @@ sign_kext "${NVGFX_NVRM:-}" "$OUT/Library/Extensions/NVRM.kext"; sign_kext "${NV
 swap_kext "${NVGFX_NVACCEL15:-}" "$OUT/Library/Extensions/NVAccel.kext"
 [ -d "$OUT/Library/NullMoth/kexts/15/NVAccel.kext" ] && swap_kext "${NVGFX_NVACCEL15:-}" "$OUT/Library/NullMoth/kexts/15/NVAccel.kext"
 [ -d "$OUT/Library/NullMoth/kexts/26/NVAccel.kext" ] && swap_kext "${NVGFX_NVACCEL26:-}" "$OUT/Library/NullMoth/kexts/26/NVAccel.kext"
+if [ -n "${NVGFX_NMINTELFB:-}" ]; then
+  [ -f "$NVGFX_NMINTELFB/Contents/MacOS/NMIntelFB" ] || { echo "FAIL NVGFX_NMINTELFB is not a built NMIntelFB.kext"; exit 3; }
+  n=0
+  while IFS= read -r k; do swap_kext "$NVGFX_NMINTELFB" "$OUT/${k#./}"; n=$((n + 1)); done < <(cd "$OUT" && find . -type d -name NMIntelFB.kext)
+  [ "$n" -gt 0 ] || { echo "FAIL the shipped package holds no NMIntelFB.kext to replace"; exit 3; }
+fi
 if [ -n "${NVGFX_FW_FROM:-}" ]; then
   FWV=$(sed -n 's/^VER=//p' "$OUT/fw_fetch.sh" | head -1)
   [ -n "$FWV" ] && [ -d "$NVGFX_FW_FROM/Users/Shared/nvfw/nvidia/$FWV" ] || { echo "FAIL no firmware $FWV under $NVGFX_FW_FROM/Users/Shared/nvfw"; exit 3; }
