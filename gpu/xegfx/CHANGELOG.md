@@ -15,6 +15,9 @@ Versions are the kext's `CFBundleVersion`. "Booted" means the version ran on the
   pass. The result is in the kernel log line "stage 4 boot framebuffer move" and in the GPU's `xegfx-fbmove` property.
 - First run on macOS 26.7.3 beta (25G416): loads and passes stages 1 to 7 unchanged.
 - `tools/link.sh` takes `NO_LINKCHECK=1` to skip the checks that read the kernel collections.
+- Tester result (samwu07, ThinkBook 14+ 155H `7D55`, macOS 15.8.1 24H32, the released zip): stage 4 move status 1,
+  `0xfe800000` to `0x80000000`, stages reach 7, desktop up
+  ([report](https://github.com/watchthelight-labs/WTLIntelGfx/pull/16#issuecomment-6847114272)). The Legion (`7D67`) takes the not-needed path.
 
 ## 0.0.47 (booted: N-355)
 
