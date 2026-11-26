@@ -3639,10 +3639,30 @@ static NVMTLBuffer *nvmtl_bytes_ring(NVMTLCommandBuffer *cb, NSUInteger len, siz
 - (void)useHeap:(id<MTLHeap>)h {}
 - (void)useHeap:(id<MTLHeap>)h stages:(MTLRenderStages)st {}
 - (void)sampleCountersInBuffer:(id)sb atSampleIndex:(NSUInteger)i withBarrier:(BOOL)b { nvmtl_sample_counter(_cb, sb, i, self, b); }
-- (void)textureBarrier { nvmtl_vk_cmd_barrier(&_cb->_c); }
+// A pass that samples its own target reads the copy taken before the pass (_snap), so a barrier has to bring that copy up
+// to date: end the physical pass, copy the target into it, resume with LOAD. After jxy333967's patch; xe-live bit 8192 = old way
+- (void)nvmtlBarrierRefreshSnap {
+    BOOL plain = _begun && _cb->_c.in_rp && _snap && _target && _ps && !_passDepth && !_pass.ds && _passSamples <= 1 && !_resolve
+        && !_visBuf && !_visActive && !_target->_parent && !_target->_viewParent && !_target->_baseLevel && !_target->_baseSlice
+        && !_pass.col_level[0] && !_pass.col_layer[0] && !_cb->_c.self_tex && !(nvmtl_xe_live_mask_r(1) & 8192);
+    for (unsigned i = 1; plain && i < NVMTL_NCOL; i++) if (_pass.col[i]) plain = NO;
+    nvk_image *t = plain ? [_target nvi] : NULL, *sn = plain ? [_snap nvi] : NULL;
+    if (!plain || t->samples > 1 || t->layers > 1 || t->mips > 1 || t->fmt != sn->fmt || t->w != sn->w || t->h != sn->h) {
+        nvmtl_vk_cmd_barrier(&_cb->_c); return; }
+    NVMTLRenderPipelineState *ps = _ps;
+    nvmtl_vk_cmd_end_render(&_cb->_c); _begun = NO;
+    int rc = nvmtl_vk_cmd_copy_image(&_cb->_c, t, 0, 0, sn, 0, 0, t->w, t->h);
+    uint32_t keep = _pass.load; _pass.load |= NVMTL_LOAD_ALL;
+    [self setRenderPipelineState:ps];                                              // begins the pass again and reapplies its state
+    _pass.load = keep;
+    if (rc || !_begun) { [self nvmtlSamplePositionError:@"texture barrier: snapshot refresh failed"]; return; }
+    static int told; if (!told++) nvlog("texture barrier: self-read snapshot refreshed inside a pass (first time in this process)");
+}
+- (void)textureBarrier { [self nvmtlBarrierRefreshSnap]; }
 - (void)updateFence:(id<MTLFence>)f afterStages:(MTLRenderStages)st {}
 - (void)waitForFence:(id<MTLFence>)f beforeStages:(MTLRenderStages)st { nvmtl_vk_cmd_barrier(&_cb->_c); }
-- (void)memoryBarrierWithScope:(MTLBarrierScope)scope afterStages:(MTLRenderStages)a beforeStages:(MTLRenderStages)b { nvmtl_vk_cmd_barrier(&_cb->_c); }
+- (void)memoryBarrierWithScope:(MTLBarrierScope)scope afterStages:(MTLRenderStages)a beforeStages:(MTLRenderStages)b {
+    if (scope & MTLBarrierScopeRenderTargets) [self nvmtlBarrierRefreshSnap]; else nvmtl_vk_cmd_barrier(&_cb->_c); }
 - (void)memoryBarrierWithResources:(const id<MTLResource> __unsafe_unretained [])r count:(NSUInteger)n afterStages:(MTLRenderStages)a beforeStages:(MTLRenderStages)b { nvmtl_vk_cmd_barrier(&_cb->_c); }
 - (void)drawPrimitives:(MTLPrimitiveType)type indirectBuffer:(id<MTLBuffer>)buf indirectBufferOffset:(NSUInteger)off {
     NVMTLBuffer *nb = (NVMTLBuffer *)buf;

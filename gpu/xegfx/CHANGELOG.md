@@ -2,6 +2,20 @@
 
 Versions are the kext's `CFBundleVersion`. "Booted" means the version ran on the test laptop (Legion 5 15IAX10, Arrow Lake iGPU `8086:7D67`); "built" means it compiled and has not been run. Prereleases with a binary: v0.0.27, v0.0.35, v0.0.36, v0.0.38, v0.0.45, v0.0.46 and v0.0.47.
 
+## Unreleased (plugin, booted: N-384, 2026-11-26)
+
+- Metal plugin: a texture barrier now refreshes the self-read snapshot. The finding is jxy333967's
+  (samwu07/xegfx-thinkbook14plus-mtl issue 2), and a tester's rendering faults on a Core Ultra 5 225H went away with
+  the same change. Writing 8192 to `/Library/GPUBundles/nvmtl/xe-live` turns it off for an A/B test. The test laptop
+  showed no such fault before, and shows none with it: this boot proves only that it does no harm here.
+- First WindowServer run on macOS 26.7.3 beta 25G416, with XeGfx 0.0.48, XeGfxAccel 0.9, XeGfxAGDC 0.1.1 and
+  XeGfxIntelFB 0.10: stages 1 to 7, the Vulkan and Metal probes, then 300 s with WindowServer on the Intel GPU
+  (12 accelerator clients). The plugin ran against the shader translator of NullMoth's 2.9 package.
+- What the accelerated desktop is worth on this laptop at idle, 150 s each within the same half hour: composited in
+  software the package averaged 93.5 C at 50.6 W with WindowServer at 70 to 220 % CPU; accelerated it averaged
+  56.4 C at 17.0 W with WindowServer near 2 %. The laptop's cooler is weak, so the temperatures are high for this
+  model; the power figures carry over better.
+
 ## XeGfxIntelFB 0.10 (booted: N-383, 2026-11-26)
 
 XeGfx.kext itself is unchanged (0.0.48). This is the framebuffer kext for the built-in panel.
