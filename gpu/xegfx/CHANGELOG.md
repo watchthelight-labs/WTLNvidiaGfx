@@ -2,6 +2,27 @@
 
 Versions are the kext's `CFBundleVersion`. "Booted" means the version ran on the test laptop (Legion 5 15IAX10, Arrow Lake iGPU `8086:7D67`); "built" means it compiled and has not been run. Prereleases with a binary: v0.0.27, v0.0.35, v0.0.36, v0.0.38, v0.0.45, v0.0.46 and v0.0.47.
 
+## XeGfxIntelFB 0.10 (booted: N-383, 2026-11-26)
+
+XeGfx.kext itself is unchanged (0.0.48). This is the framebuffer kext for the built-in panel.
+
+- The hardware cursor works with the firmware framebuffer at any GGTT base. 0.9 only took a framebuffer at
+  `0xFF000000`, where the Legion's firmware puts it. 0.10 reads the base, stride and height of plane 1A, works out
+  where the framebuffer ends and keeps the cursor's 64 pages above it; a framebuffer that reaches past `0xFFFA0000`,
+  a tiled plane or a busy cursor plane still turns the hardware cursor off. The kernel log says which:
+  `XeGfxIntelFB: hw cursor ready: 256x256 ARGB at GGTT fffa0000, firmware framebuffer ff000000-fffa0000`, or a
+  "hw cursor off" line with the register values. Tested only on the Legion, where the base is the old fixed one;
+  other bases are checked by reading the code, not on hardware.
+- Boot guard fix. Every start of the kext counts in the NVRAM variable `xeintelfb-starts` and clears it 120 s later;
+  two counted starts turn the kext off so a hanging panel driver cannot loop. Only the first clear of a boot ran, so
+  a second start in the same boot stayed counted, and with one more leftover the kext stayed off for good while the
+  panel ran on Apple's IONDRVFramebuffer without anything on screen saying so. Each start now arms its own clear.
+  If the panel is on IONDRVFramebuffer and `nvram 7C436110-AB2A-4BBB-A880-FE41995C9F82:xeintelfb-starts` reads 2,
+  delete the variable and restart.
+- 0.9 (2026-10-31, not listed here before): hardware cursor on pipe A's cursor plane, 256x256 ARGB.
+- Release `xeintelfb-0.10`: the kext with `install.sh` and `uninstall.sh` (they rebuild the auxiliary kernel
+  collection; run them only with XeGfx not loaded).
+
 ## 0.0.48 (booted: N-372)
 
 - Stage 4 moves the boot framebuffer out of the GuC area before i915 starts (WTLIntelGfx issue #13). When the GOP's
@@ -15,6 +36,9 @@ Versions are the kext's `CFBundleVersion`. "Booted" means the version ran on the
   pass. The result is in the kernel log line "stage 4 boot framebuffer move" and in the GPU's `xegfx-fbmove` property.
 - First run on macOS 26.7.3 beta (25G416): loads and passes stages 1 to 7 unchanged.
 - `tools/link.sh` takes `NO_LINKCHECK=1` to skip the checks that read the kernel collections.
+- Tester result (samwu07, ThinkBook 14+ 155H `7D55`, macOS 15.8.1 24H32, the released zip): stage 4 move status 1,
+  `0xfe800000` to `0x80000000`, stages reach 7, desktop up
+  ([report](https://github.com/watchthelight-labs/WTLIntelGfx/pull/16#issuecomment-6847114272)). The Legion (`7D67`) takes the not-needed path.
 
 ## 0.0.47 (booted: N-355)
 

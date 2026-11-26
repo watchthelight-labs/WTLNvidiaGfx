@@ -51,9 +51,9 @@ static void xifbGuardCount()
 }
 static void xifbGuardClear()
 {
-    static bool done; if (done) return; done = true;
     IORegistryEntry *o = IORegistryEntry::fromPath("/options", gIODTPlane); if (!o) return;
     // removeProperty did not reach NVRAM (N-283); a zero count does, the same way the count itself is written
+    // every start arms its own clear: a once-per-boot clear left a second start of the same boot counted (I-141)
     unsigned char z = 0;
     if (OSData *d = OSData::withBytes(&z, 1)) { if (o->setProperty(XIFB_GUARD_VAR, d)) XIFBLOG("boot guard cleared: still up 120 s after start"); d->release(); }
     o->release();
@@ -158,8 +158,9 @@ static uint32_t xifbSnapHz(const uint8_t *e, int len, uint32_t meas)
 
 // Hardware cursor on pipe A's cursor plane. Without one IOFramebuffer draws a software cursor, every move damages a
 // rect around it, and WindowServer recomposites blurred window backdrops there (the I-119 square).
-// The GOP maps a 16 MB GGTT block at 0xff000000 for its 16,384,000-byte framebuffer; the 96 pages after it lie in
-// i915's reserved top of GGTT, so pointing 64 of them at our own pages leaves everything else alone.
+// The GOP maps a GGTT block for its framebuffer (0xff000000 on the Legion, 0xff600000 on another laptop's firmware, so
+// the address is read from PLANE_SURF, not assumed). Our 64 pages at XIFB_CUR_GGTT lie in i915's reserved top of GGTT, so
+// pointing them at our own pages leaves everything else alone as long as the GOP block ends below them (curSetup checks).
 #define XIFB_CUR_DIM   256u
 #define XIFB_CUR_GGTT  0xfffa0000u
 #define XIFB_GSM       0x800000u                     // GGTT PTEs in BAR0
@@ -171,6 +172,11 @@ static uint32_t xifbSnapHz(const uint8_t *e, int len, uint32_t meas)
 #define XIFB_CUR_BUF   0x7017c
 #define XIFB_P1_BUF    0x7027c
 #define XIFB_P1_SURF   0x7019c
+// PLANE_CTL_1_A, PLANE_STRIDE_1_A and PLANE_SIZE_1_A (i915 intel_display_regs.h; same offsets as REG_PLANE_*_1A in
+// shim/include/xg_fbreloc.h). Used only to find where the firmware framebuffer ends.
+#define XIFB_P1_CTL    0x70180
+#define XIFB_P1_STRIDE 0x70188
+#define XIFB_P1_SIZE   0x70190
 
 class XeGfxIntelFramebuffer : public IONDRVFramebuffer {
     OSDeclareDefaultStructors(XeGfxIntelFramebuffer)
@@ -192,9 +198,22 @@ class XeGfxIntelFramebuffer : public IONDRVFramebuffer {
     bool curSetup() {
         int off = 0;
         if (PE_parse_boot_argn("-xeintelfbnohwc", &off, sizeof off) || !fR) return false;
-        if (rd(XIFB_CUR_CTL) || rd(XIFB_P1_SURF) != 0xff000000u || rd(XIFB_P1_BUF) != 0x07ff0000u) {
-            XIFBLOG("hw cursor off: display not as the GOP left it (cur %08x surf %08x buf %08x)", rd(XIFB_CUR_CTL),
-                    rd(XIFB_P1_SURF), rd(XIFB_P1_BUF));
+        // Accept the GOP's framebuffer wherever the firmware put it, as long as it ends below our cursor pages. The block
+        // is PLANE_SURF (page aligned base) for PLANE_STRIDE (64 byte units, linear) times PLANE_SIZE height (field is
+        // height - 1, bits 31:16) bytes, the same arithmetic as fbr_target_scanned() in xg_fbreloc.h. A tiled plane has
+        // another stride unit, so it is refused rather than guessed at. The idea of not pinning the address comes from a
+        // public fork's 0.9.5 (a laptop whose GOP sits at 0xff600000); this check is our own.
+        // PLANE_BUF_CFG stays pinned (start 0, end 0x7ff: all 2048 DBUF blocks): curDdb() carves the cursor's 32 blocks
+        // out of exactly that allocation and writes plane 1 back as 0x07df0000. A different split would be overwritten
+        // blindly. That depends on the display engine's DBUF, not on a GGTT address, so it is not machine specific here.
+        const uint32_t surf = rd(XIFB_P1_SURF), pctl = rd(XIFB_P1_CTL);
+        const uint64_t fbBytes = ((uint64_t)(rd(XIFB_P1_STRIDE) & 0x7ffu) * 64u) * (((rd(XIFB_P1_SIZE) >> 16) & 0xffffu) + 1u);
+        const uint64_t fbEnd = (uint64_t)surf + ((fbBytes + 0xfffu) & ~0xfffull);
+        const bool tiled = (pctl & (7u << 10)) != 0;                       // PLANE_CTL_TILED bits 12:10, 0 is linear
+        const bool overlap = !fbBytes || fbEnd > XIFB_CUR_GGTT;      // the block must end at or below our 64 pages (also refuses one above)
+        if (rd(XIFB_CUR_CTL) || !surf || (surf & 0xfffu) || tiled || overlap || rd(XIFB_P1_BUF) != 0x07ff0000u) {
+            XIFBLOG("hw cursor off: display not as the GOP left it (cur %08x surf %08x end %llx buf %08x ctl %08x)", rd(XIFB_CUR_CTL),
+                    surf, (unsigned long long)fbEnd, rd(XIFB_P1_BUF), pctl);
             return false;
         }
         const size_t bytes = XIFB_CUR_DIM * XIFB_CUR_DIM * 4;
@@ -211,7 +230,8 @@ class XeGfxIntelFramebuffer : public IONDRVFramebuffer {
         bzero(fCurKva, bytes); __asm__ __volatile__("sfence" ::: "memory");
         fCurLock = IOSimpleLockAlloc();
         fCurReady = fCurLock != nullptr;
-        XIFBLOG("hw cursor ready: %ux%u ARGB at GGTT %08x", XIFB_CUR_DIM, XIFB_CUR_DIM, XIFB_CUR_GGTT);
+        XIFBLOG("hw cursor ready: %ux%u ARGB at GGTT %08x, firmware framebuffer %08x-%llx", XIFB_CUR_DIM, XIFB_CUR_DIM,
+                XIFB_CUR_GGTT, surf, (unsigned long long)fbEnd);
         return fCurReady;
     }
     // the GOP gave plane 1 all 2048 DBUF blocks; the cursor takes the last 32 (i915's single-pipe cursor share)
