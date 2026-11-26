@@ -48,7 +48,7 @@ from your machine, working or not, is the most useful thing you can send ([issue
 | Meteor Lake (Core Ultra 100H, 100U) | 7D55, 7DD5, 7D45, 7D40 | Xe-LPG | **runs**: Metal on two 155H laptops (tester reports, Sequoia) |
 | Arrow Lake-H / U (Core Ultra 200H, 200U) | 7D51, 7DD1, 7D41 | Xe-LPG(+) | **runs**: desktop on a 255H with frames copied, not flipped (tester report, [#14](https://github.com/watchthelight-labs/WTLIntelGfx/issues/14)) |
 | Tiger Lake (11th gen Core) | 9A49, 9A40, 9A78, 9A60 | Xe-LP (Iris Xe, UHD) | stage 2 probe passes on 9A60 and 9A49 (tester reports); later stages need its own GuC firmware linked in |
-| Alder Lake, Raptor Lake (12th to 14th gen mobile) | 46A6, 46A3, 46A8, 4688, A7A0, A7A8, A788, A78B | Xe-LP (Iris Xe, UHD) | stage 2 probe passes on 46A6 and on A788 in discrete mode, stages 1 to 3 on 46A3 (tester reports); later stages need their own GuC firmware |
+| Alder Lake, Raptor Lake (12th to 14th gen mobile) | 46A6, 46A3, 46A8, 4688, A7A0, A7A8, A788, A78B | Xe-LP (Iris Xe, UHD) | stage 2 probe passes on 46A6, 46A8 and on A788 in discrete mode, stages 1 to 3 on 46A3 (tester reports); later stages need their own GuC firmware |
 | Intel Arc A-series (Alchemist) | 56A0, 56A1, 5690 | Xe-HPG | stages 1 and 2 pass on an A770 passed through to a VM; stage 3 needs `xegfx.pci_scan_all=1` because the card is not on bus 0 ([#3](https://github.com/watchthelight-labs/WTLIntelGfx/issues/3#issuecomment-6662851589)) |
 | Lunar Lake, Battlemage, Panther Lake | 64A0, E20B, E20C | Xe2 and later | needs the xe driver, not i915 ([issue #8](https://github.com/watchthelight-labs/WTLIntelGfx/issues/8)) |
 
@@ -147,6 +147,7 @@ XeGfx is built on other people's work. Thanks to all of them.
 | [taqieallah/ThinkPad-E16-ArrowLake-macOS](https://github.com/taqieallah/ThinkPad-E16-ArrowLake-macOS) | 0.0.47 on a ThinkPad E16 (`7D51`) with a zero-copy flip, and a CPU that stays near 550 MHz as the open problem there |
 | [change-48/XEGFX-MIGRATE](https://github.com/change-48/XEGFX-MIGRATE) | a bring-up log on `7D51`: when `reserve_bootfb` fails the accelerator can overwrite the boot framebuffer, plane geometry only latches on a `PLANE_SURF` write, and where a 24.8 ms frame spends its time |
 | [acidanthera/WhateverGreen](https://github.com/acidanthera/WhateverGreen) and [OpenCorePkg](https://github.com/acidanthera/OpenCorePkg) | the Intel framebuffer background every Hackintosh graphics project builds on |
+| [lems-hardware/lhl-srcu-patch](https://github.com/lems-hardware/lhl-srcu-patch) | a sleepable SRCU for a LinuxKPI shim on macOS: two epoch counters, and a reader that checks the epoch again after counting itself in, the detail our own sketch lacked ([#11](https://github.com/watchthelight-labs/WTLIntelGfx/issues/11)) |
 
 **Testers** (reports from machines other than ours; every result counts, working or not):
 
@@ -178,6 +179,8 @@ XeGfx is built on other people's work. Thanks to all of them.
 | [sulthonuladib](https://github.com/sulthonuladib) | HP Victus 15-fa0xxx, `46A6` | Alder Lake-P device data on a laptop with no MUX |
 | [nidemimihihi](https://github.com/nidemimihihi) | TOPC RPL-HX MATX desktop board (HM770), i7-14650HX, `A78B` | device data and BIOS graphics settings from a mobile-on-desktop board; the 14650HX iGPU is `A78B`, class 0380; stage 2 passes on 0.0.47 with an AMD card driving the display |
 | [pubglite55](https://github.com/pubglite55) | ASUS ROG Zephyrus M16 GU603ZM, i7-12700H, `46A6` | Alder Lake-P configuration data |
+| [sortedcord](https://github.com/sortedcord) | Motorola moto book 60 pro, Core Ultra 5 225H, `7D51` | by his README an accelerated desktop on 0.0.48 with samwu07's Metal stack on Sequoia 15.8.3; the boot framebuffer sits at GGTT `0xFF600000`, a fourth address our hardware cursor check refuses ([repo](https://github.com/sortedcord/MotoBook60Pro-Hackintosh-EFI)) |
+| [iqsanfm](https://github.com/iqsanfm) | Dell Latitude 7430, i7-1265U, `46A8` | stage 2 probe passes on 0.0.48 (pipe A lit, 1920x1080), the first `46A8` report ([#3](https://github.com/watchthelight-labs/WTLIntelGfx/issues/3#issuecomment-7102593916)) |
 
 ## How it stays safe to test
 
